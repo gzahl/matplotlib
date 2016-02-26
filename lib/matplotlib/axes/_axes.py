@@ -4465,8 +4465,8 @@ class Axes(_AxesBase):
                          label_namer=None)
     def streamplot(self, x, y, u, v, density=1, linewidth=None, color=None,
                    cmap=None, norm=None, arrowsize=1, arrowstyle='-|>',
-                   minlength=0.1, maxlength=2.0,transform=None, zorder=2,
-                   start_points=None):
+                   minlength=0.1, maxlength=4.0,transform=None, zorder=2,
+                   start_points=None,integration_direction='both'):
         if not self._hold:
             self.cla()
         stream_container = mstream.streamplot(self, x, y, u, v,
@@ -4481,6 +4481,7 @@ class Axes(_AxesBase):
                                               maxlength=maxlength,
                                               start_points=start_points,
                                               transform=transform,
+                                              integration_direction=integration_direction,
                                               zorder=zorder)
         return stream_container
     streamplot.__doc__ = mstream.streamplot.__doc__
