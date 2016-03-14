@@ -3268,7 +3268,7 @@ def step(x, y, *args, **kwargs):
 @_autogen_docstring(Axes.streamplot)
 def streamplot(x, y, u, v, density=1, linewidth=None, color=None, cmap=None,
                norm=None, arrowsize=1, arrowstyle='-|>', minlength=0.1,
-               maxlength=4.0, transform=None, zorder=2, start_points=None,
+               transform=None, zorder=2, start_points=None, maxlength=4.0,
                integration_direction='both', hold=None, data=None):
     ax = gca()
     # allow callers to override the hold state by passing hold=True|False
@@ -3280,9 +3280,9 @@ def streamplot(x, y, u, v, density=1, linewidth=None, color=None, cmap=None,
         ret = ax.streamplot(x, y, u, v, density=density, linewidth=linewidth,
                             color=color, cmap=cmap, norm=norm,
                             arrowsize=arrowsize, arrowstyle=arrowstyle,
-                            minlength=minlength, maxlength=maxlength,
-                            transform=transform, zorder=zorder,
-                            start_points=start_points,
+                            minlength=minlength, transform=transform,
+                            zorder=zorder, start_points=start_points,
+                            maxlength=maxlength,
                             integration_direction=integration_direction,
                             data=data)
     finally:
