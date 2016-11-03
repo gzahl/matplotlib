@@ -1,7 +1,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
+import six
 
 import datetime
 
@@ -10,6 +10,7 @@ from matplotlib import mlab
 from matplotlib.testing.decorators import cleanup, image_comparison
 from matplotlib import pyplot as plt
 from nose.tools import assert_equal, assert_raises
+from numpy.testing import assert_array_almost_equal
 import warnings
 
 import re
@@ -107,11 +108,10 @@ def test_contour_shape_mismatch_4():
     try:
         ax.contour(b, g, z)
     except TypeError as exc:
-        print(exc.args[0])
         assert re.match(
             r'Shape of x does not match that of z: ' +
             r'found \(9L?, 9L?\) instead of \(9L?, 10L?\)\.',
-            exc.args[0]) is not None
+            exc.args[0]) is not None, exc.args[0]
 
     try:
         ax.contour(g, b, z)
@@ -119,7 +119,7 @@ def test_contour_shape_mismatch_4():
         assert re.match(
             r'Shape of y does not match that of z: ' +
             r'found \(9L?, 9L?\) instead of \(9L?, 10L?\)\.',
-            exc.args[0]) is not None
+            exc.args[0]) is not None, exc.args[0]
 
 
 @cleanup
@@ -288,8 +288,9 @@ def test_contourf_decreasing_levels():
     # Legacy contouring algorithm gives a warning rather than raising an error,
     # plus a DeprecationWarning.
     with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
         plt.contourf(z, [1.0, 0.0], corner_mask='legacy')
-    assert_equal(len(w), 2)
+        assert_equal(len(w), 2)
 
 
 @cleanup
@@ -299,16 +300,27 @@ def test_vminvmax_warning():
     cs = plt.contourf(z, [0.0, 1.0])
 
     with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
         cs.vmin
-    assert len(w) == 1
-    assert (str(w[0].message).startswith(
-            ("vmin is deprecated and will be removed in 2.2 ")))
+        assert len(w) == 1
+        msg = "vmin is deprecated and will be removed in 2.2 "
+        assert str(w[0].message).startswith(msg)
 
     with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
         cs.vmax
-    assert len(w) == 1
-    assert (str(w[0].message).startswith(
-            ("vmax is deprecated and will be removed in 2.2 ")))
+        assert len(w) == 1
+        msg = "vmax is deprecated and will be removed in 2.2 "
+        assert str(w[0].message).startswith(msg)
+
+
+@cleanup
+def test_contourf_symmetric_locator():
+    # github issue 7271
+    z = np.arange(12).reshape((3, 4))
+    locator = plt.MaxNLocator(nbins=4, symmetric=True)
+    cs = plt.contourf(z, locator=locator)
+    assert_array_almost_equal(cs.levels, np.linspace(-12, 12, 5))
 
 
 if __name__ == '__main__':

@@ -6,14 +6,17 @@ These settings were shamelessly stolen from [1]_ (with permission).
 
 .. [1] http://www.huyng.com/posts/sane-color-scheme-for-matplotlib/
 
-.. _ggplot: http://had.co.nz/ggplot/
-.. _R: http://www.r-project.org/
+.. _ggplot: http://ggplot2.org/
+.. _R: https://www.r-project.org/
 
 """
 import numpy as np
 import matplotlib.pyplot as plt
 
 plt.style.use('ggplot')
+
+# Fixing random state for reproducibility
+np.random.seed(19680801)
 
 fig, axes = plt.subplots(ncols=2, nrows=2)
 ax1, ax2, ax3, ax4 = axes.ravel()

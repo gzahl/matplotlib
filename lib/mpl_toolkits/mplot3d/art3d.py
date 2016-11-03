@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # art3d.py, original mplot3d version by John Porter
 # Parts rewritten by Reinier Heeres <reinier@heeres.eu>
 # Minor additions by Ben Axelrod <baxelrod@coroware.com>
@@ -10,8 +9,8 @@ artists into 3D versions which can be added to an Axes3D.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
-from matplotlib.externals.six.moves import zip
+import six
+from six.moves import zip
 
 from matplotlib import lines, text as mtext, path as mpath, colors as mcolors
 from matplotlib import artist
@@ -389,12 +388,12 @@ class Patch3DCollection(PatchCollection):
 
         fcs = (zalpha(self._facecolor3d, vzs) if self._depthshade else
                self._facecolor3d)
-        fcs = mcolors.colorConverter.to_rgba_array(fcs, self._alpha)
+        fcs = mcolors.to_rgba_array(fcs, self._alpha)
         self.set_facecolors(fcs)
 
         ecs = (zalpha(self._edgecolor3d, vzs) if self._depthshade else
                self._edgecolor3d)
-        ecs = mcolors.colorConverter.to_rgba_array(ecs, self._alpha)
+        ecs = mcolors.to_rgba_array(ecs, self._alpha)
         self.set_edgecolors(ecs)
         PatchCollection.set_offsets(self, list(zip(vxs, vys)))
 
@@ -457,12 +456,12 @@ class Path3DCollection(PathCollection):
 
         fcs = (zalpha(self._facecolor3d, vzs) if self._depthshade else
                self._facecolor3d)
-        fcs = mcolors.colorConverter.to_rgba_array(fcs, self._alpha)
+        fcs = mcolors.to_rgba_array(fcs, self._alpha)
         self.set_facecolors(fcs)
 
         ecs = (zalpha(self._edgecolor3d, vzs) if self._depthshade else
                self._edgecolor3d)
-        ecs = mcolors.colorConverter.to_rgba_array(ecs, self._alpha)
+        ecs = mcolors.to_rgba_array(ecs, self._alpha)
         self.set_edgecolors(ecs)
         PathCollection.set_offsets(self, list(zip(vxs, vys)))
 
@@ -622,7 +621,8 @@ class Poly3DCollection(PolyCollection):
         if len(cedge) != len(xyzlist):
             if len(cedge) == 0:
                 cedge = cface
-            cedge = cedge.repeat(len(xyzlist), axis=0)
+            else:
+                cedge = cedge.repeat(len(xyzlist), axis=0)
 
         # if required sort by depth (furthest drawn first)
         if self._zsort:
@@ -684,12 +684,12 @@ class Poly3DCollection(PolyCollection):
                 raise TypeError('alpha must be a float or None')
         artist.Artist.set_alpha(self, alpha)
         try:
-            self._facecolors = mcolors.colorConverter.to_rgba_array(
+            self._facecolors = mcolors.to_rgba_array(
                 self._facecolors3d, self._alpha)
         except (AttributeError, TypeError, IndexError):
             pass
         try:
-            self._edgecolors = mcolors.colorConverter.to_rgba_array(
+            self._edgecolors = mcolors.to_rgba_array(
                     self._edgecolors3d, self._alpha)
         except (AttributeError, TypeError, IndexError):
             pass
@@ -764,7 +764,7 @@ def get_colors(c, num):
     """Stretch the color argument to provide the required number num"""
 
     if type(c) == type("string"):
-        c = mcolors.colorConverter.to_rgba(c)
+        c = mcolors.to_rgba(c)
 
     if iscolor(c):
         return [c] * num

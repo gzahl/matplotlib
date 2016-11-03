@@ -11,11 +11,15 @@ line segemnts)
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
-from matplotlib.externals.six.moves import zip
-import warnings
+import six
+from six.moves import zip
+try:
+    from math import gcd
+except ImportError:
+    # LPy workaround
+    from fractions import gcd
+
 import numpy as np
-import numpy.ma as ma
 import matplotlib as mpl
 import matplotlib.cbook as cbook
 import matplotlib.colors as mcolors
@@ -24,14 +28,16 @@ from matplotlib import docstring
 import matplotlib.transforms as transforms
 import matplotlib.artist as artist
 from matplotlib.artist import allow_rasterization
-import matplotlib.backend_bases as backend_bases
 import matplotlib.path as mpath
 from matplotlib import _path
 import matplotlib.mlab as mlab
 import matplotlib.lines as mlines
 
-
 CIRCLE_AREA_FACTOR = 1.0 / np.sqrt(np.pi)
+
+
+_color_aliases = {'facecolors': ['facecolor'],
+                  'edgecolors': ['edgecolor']}
 
 
 class Collection(artist.Artist, cm.ScalarMappable):
@@ -77,7 +83,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
     (i.e., a call to set_array has been made), at draw time a call to
     scalar mappable will be made to set the face colors.
     """
-    _offsets = np.array([], np.float_)
+    _offsets = np.array([], float)
     # _offsets must be a Nx2 array!
     _offsets.shape = (0, 2)
     _transOffset = transforms.IdentityTransform()
@@ -117,9 +123,18 @@ class Collection(artist.Artist, cm.ScalarMappable):
         """
         artist.Artist.__init__(self)
         cm.ScalarMappable.__init__(self, norm, cmap)
+        # list of un-scaled dash patterns
+        # this is needed scaling the dash pattern by linewidth
+        self._us_linestyles = [(None, None)]
+        # list of dash patterns
+        self._linestyles = [(None, None)]
+        # list of unbroadcast/scaled linewidths
+        self._us_lw = [0]
+        self._linewidths = [0]
+        self._is_filled = True  # May be modified by set_facecolor().
 
-        self.set_edgecolor(edgecolors)
         self.set_facecolor(facecolors)
+        self.set_edgecolor(edgecolors)
         self.set_linewidth(linewidths)
         self.set_linestyle(linestyles)
         self.set_antialiased(antialiaseds)
@@ -130,7 +145,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
         self.set_zorder(zorder)
 
         self._uniform_offsets = None
-        self._offsets = np.array([[0, 0]], np.float_)
+        self._offsets = np.array([[0, 0]], float)
         if offsets is not None:
             offsets = np.asanyarray(offsets)
             offsets.shape = (-1, 2)             # Make it Nx2
@@ -151,7 +166,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
         except TypeError:
             if cbook.iterable(val) and len(val):
                 try:
-                    float(val[0])
+                    float(cbook.safe_first_element(val))
                 except (TypeError, ValueError):
                     pass  # raise below
                 else:
@@ -164,7 +179,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
         if not cbook.iterable(val):
             val = (val,)
         try:
-            bool(val[0])
+            bool(cbook.safe_first_element(val))
         except (TypeError, IndexError):
             raise TypeError('val must be a bool or nonzero sequence of them')
         return val
@@ -198,8 +213,8 @@ class Collection(artist.Artist, cm.ScalarMappable):
             offsets = transOffset.transform_non_affine(offsets)
             transOffset = transOffset.get_affine()
 
-        offsets = np.asanyarray(offsets, np.float_)
-        if np.ma.isMaskedArray(offsets):
+        offsets = np.asanyarray(offsets, float)
+        if isinstance(offsets, np.ma.MaskedArray):
             offsets = offsets.filled(np.nan)
             # get_path_collection_extents handles nan but not masked arrays
         offsets.shape = (-1, 2)                     # Make it Nx2
@@ -240,7 +255,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
                 ys = self.convert_yunits(offsets[:, 1])
                 offsets = list(zip(xs, ys))
 
-        offsets = np.asanyarray(offsets, np.float_)
+        offsets = np.asanyarray(offsets, float)
         offsets.shape = (-1, 2)             # Make it Nx2
 
         if not transform.is_affine:
@@ -252,7 +267,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
             # This might have changed an ndarray into a masked array.
             transOffset = transOffset.get_affine()
 
-        if np.ma.isMaskedArray(offsets):
+        if isinstance(offsets, np.ma.MaskedArray):
             offsets = offsets.filled(np.nan)
             # Changing from a masked array to nan-filled ndarray
             # is probably most efficient at this point.
@@ -313,7 +328,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
         if do_single_path_optimization:
             gc.set_foreground(tuple(edgecolors[0]))
             gc.set_linewidth(self._linewidths[0])
-            gc.set_linestyle(self._linestyles[0])
+            gc.set_dashes(*self._linestyles[0])
             gc.set_antialiased(self._antialiaseds[0])
             gc.set_url(self._urls[0])
             renderer.draw_markers(
@@ -351,19 +366,11 @@ class Collection(artist.Artist, cm.ScalarMappable):
         if not self.get_visible():
             return False, {}
 
-        if self._picker is True:  # the Boolean constant, not just nonzero or 1
-            pickradius = self._pickradius
-        else:
-            try:
-                pickradius = float(self._picker)
-            except TypeError:
-                # This should not happen if "contains" is called via
-                # pick, the normal route; the check is here in case
-                # it is called through some unanticipated route.
-                warnings.warn(
-                    "Collection picker %s could not be converted to float"
-                    % self._picker)
-                pickradius = self._pickradius
+        pickradius = (
+            float(self._picker)
+            if cbook.is_numlike(self._picker) and
+               self._picker is not True  # the bool, not just nonzero or 1
+            else self._pickradius)
 
         transform, transOffset, offsets, paths = self._prepare_points()
 
@@ -429,7 +436,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
 
         ACCEPTS: float or sequence of floats
         """
-        offsets = np.asanyarray(offsets, np.float_)
+        offsets = np.asanyarray(offsets, float)
         offsets.shape = (-1, 2)             # Make it Nx2
         #This decision is based on how they are initialized above
         if self._uniform_offsets is None:
@@ -481,16 +488,15 @@ class Collection(artist.Artist, cm.ScalarMappable):
         ACCEPTS: float or sequence of floats
         """
         if lw is None:
-            if (self._edge_default or
-                    mpl.rcParams['_internal.classic_mode'] or
-                    not self._is_filled):
-                lw = mpl.rcParams['patch.linewidth']
-                if lw is None:
-                    lw = mpl.rcParams['lines.linewidth']
-            else:
-                lw = 0
+            lw = mpl.rcParams['patch.linewidth']
+            if lw is None:
+                lw = mpl.rcParams['lines.linewidth']
+        # get the un-scaled/broadcast lw
+        self._us_lw = self._get_value(lw)
 
-        self._linewidths = self._get_value(lw)
+        # scale all of the dash patterns.
+        self._linewidths, self._linestyles = self._bcast_lwls(
+            self._us_lw, self._us_linestyles)
         self.stale = True
 
     def set_linewidths(self, lw):
@@ -510,7 +516,7 @@ class Collection(artist.Artist, cm.ScalarMappable):
         ===========================   =================
         ``'-'`` or ``'solid'``        solid line
         ``'--'`` or  ``'dashed'``     dashed line
-        ``'-.'`` or  ``'dash_dot'``   dash-dotted line
+        ``'-.'`` or  ``'dashdot'``    dash-dotted line
         ``':'`` or ``'dotted'``       dotted line
         ===========================   =================
 
@@ -532,31 +538,65 @@ class Collection(artist.Artist, cm.ScalarMappable):
             The line style.
         """
         try:
-            if cbook.is_string_like(ls):
+            if cbook.is_string_like(ls) and cbook.is_hashable(ls):
                 ls = cbook.ls_mapper.get(ls, ls)
-                dashes = [mlines.get_dash_pattern(ls)]
-            elif cbook.iterable(ls):
-                try:
-                    dashes = []
-                    for x in ls:
-                        if cbook.is_string_like(x):
-                            x = cbook.ls_mapper.get(x, x)
-                            dashes.append(mlines.get_dash_pattern(x))
-                        elif cbook.iterable(x) and len(x) == 2:
-                            dashes.append(x)
-                        else:
-                            raise ValueError()
-                except ValueError:
-                    if len(ls) == 2:
-                        dashes = [ls]
-                    else:
-                        raise ValueError()
+                dashes = [mlines._get_dash_pattern(ls)]
             else:
-                raise ValueError()
+                try:
+                    dashes = [mlines._get_dash_pattern(ls)]
+                except ValueError:
+                    dashes = [mlines._get_dash_pattern(x) for x in ls]
+
         except ValueError:
-            raise ValueError('Do not know how to convert %s to dashes' % ls)
-        self._linestyles = dashes
-        self.stale = True
+            raise ValueError(
+                'Do not know how to convert {!r} to dashes'.format(ls))
+
+        # get the list of raw 'unscaled' dash patterns
+        self._us_linestyles = dashes
+
+        # broadcast and scale the lw and dash patterns
+        self._linewidths, self._linestyles = self._bcast_lwls(
+            self._us_lw, self._us_linestyles)
+
+    @staticmethod
+    def _bcast_lwls(linewidths, dashes):
+        '''Internal helper function to broadcast + scale ls/lw
+
+        In the collection drawing code the linewidth and linestyle are
+        cycled through as circular buffers (via v[i % len(v)]).  Thus,
+        if we are going to scale the dash pattern at set time (not
+        draw time) we need to do the broadcasting now and expand both
+        lists to be the same length.
+
+        Parameters
+        ----------
+        linewidths : list
+            line widths of collection
+
+        dashes : list
+            dash specification (offset, (dash pattern tuple))
+
+        Returns
+        -------
+        linewidths, dashes : list
+             Will be the same length, dashes are scaled by paired linewidth
+
+        '''
+        if mpl.rcParams['_internal.classic_mode']:
+            return linewidths, dashes
+        # make sure they are the same length so we can zip them
+        if len(dashes) != len(linewidths):
+            l_dashes = len(dashes)
+            l_lw = len(linewidths)
+            GCD = gcd(l_dashes, l_lw)
+            dashes = list(dashes) * (l_lw // GCD)
+            linewidths = list(linewidths) * (l_dashes // GCD)
+
+        # scale the dash patters
+        dashes = [mlines._scale_dashes(o, d, lw)
+                  for (o, d), lw in zip(dashes, linewidths)]
+
+        return linewidths, dashes
 
     def set_linestyles(self, ls):
         """alias for set_linestyle"""
@@ -595,6 +635,19 @@ class Collection(artist.Artist, cm.ScalarMappable):
         self.set_facecolor(c)
         self.set_edgecolor(c)
 
+    def _set_facecolor(self, c):
+        if c is None:
+            c = mpl.rcParams['patch.facecolor']
+
+        self._is_filled = True
+        try:
+            if c.lower() == 'none':
+                self._is_filled = False
+        except AttributeError:
+            pass
+        self._facecolors = mcolors.to_rgba_array(c, self._alpha)
+        self.stale = True
+
     def set_facecolor(self, c):
         """
         Set the facecolor(s) of the collection.  *c* can be a
@@ -606,17 +659,8 @@ class Collection(artist.Artist, cm.ScalarMappable):
 
         ACCEPTS: matplotlib color spec or sequence of specs
         """
-        self._is_filled = True
-        try:
-            if c.lower() == 'none':
-                self._is_filled = False
-        except AttributeError:
-            pass
-        if c is None:
-            c = mpl.rcParams['patch.facecolor']
-        self._facecolors_original = c
-        self._facecolors = mcolors.colorConverter.to_rgba_array(c, self._alpha)
-        self.stale = True
+        self._original_facecolor = c
+        self._set_facecolor(c)
 
     def set_facecolors(self, c):
         """alias for set_facecolor"""
@@ -634,6 +678,29 @@ class Collection(artist.Artist, cm.ScalarMappable):
             return self._edgecolors
     get_edgecolors = get_edgecolor
 
+    def _set_edgecolor(self, c):
+        if c is None:
+            if (mpl.rcParams['patch.force_edgecolor'] or
+                    not self._is_filled or self._edge_default):
+                c = mpl.rcParams['patch.edgecolor']
+            else:
+                c = 'none'
+        self._is_stroked = True
+        try:
+            if c.lower() == 'none':
+                self._is_stroked = False
+        except AttributeError:
+            pass
+
+        try:
+            if c.lower() == 'face':   # Special case: lookup in "get" method.
+                self._edgecolors = 'face'
+                return
+        except AttributeError:
+            pass
+        self._edgecolors = mcolors.to_rgba_array(c, self._alpha)
+        self.stale = True
+
     def set_edgecolor(self, c):
         """
         Set the edgecolor(s) of the collection. *c* can be a
@@ -647,24 +714,8 @@ class Collection(artist.Artist, cm.ScalarMappable):
 
         ACCEPTS: matplotlib color spec or sequence of specs
         """
-        self._is_stroked = True
-        try:
-            if c.lower() == 'none':
-                self._is_stroked = False
-        except AttributeError:
-            pass
-        try:
-            if c.lower() == 'face':
-                self._edgecolors = 'face'
-                self._edgecolors_original = 'face'
-                return
-        except AttributeError:
-            pass
-        if c is None:
-            c = mpl.rcParams['patch.edgecolor']
-        self._edgecolors_original = c
-        self._edgecolors = mcolors.colorConverter.to_rgba_array(c, self._alpha)
-        self.stale = True
+        self._original_edgecolor = c
+        self._set_edgecolor(c)
 
     def set_edgecolors(self, c):
         """alias for set_edgecolor"""
@@ -683,18 +734,8 @@ class Collection(artist.Artist, cm.ScalarMappable):
             except TypeError:
                 raise TypeError('alpha must be a float or None')
         artist.Artist.set_alpha(self, alpha)
-        try:
-            self._facecolors = mcolors.colorConverter.to_rgba_array(
-                self._facecolors_original, self._alpha)
-        except (AttributeError, TypeError, IndexError):
-            pass
-        try:
-            if (not isinstance(self._edgecolors_original, six.string_types)
-                             or self._edgecolors_original != str('face')):
-                self._edgecolors = mcolors.colorConverter.to_rgba_array(
-                    self._edgecolors_original, self._alpha)
-        except (AttributeError, TypeError, IndexError):
-            pass
+        self._set_facecolor(self._original_facecolor)
+        self._set_edgecolor(self._original_edgecolor)
 
     def get_linewidths(self):
         return self._linewidths
@@ -730,9 +771,9 @@ class Collection(artist.Artist, cm.ScalarMappable):
 
         artist.Artist.update_from(self, other)
         self._antialiaseds = other._antialiaseds
-        self._edgecolors_original = other._edgecolors_original
+        self._original_edgecolor = other._original_edgecolor
         self._edgecolors = other._edgecolors
-        self._facecolors_original = other._facecolors_original
+        self._original_facecolor = other._original_facecolor
         self._facecolors = other._facecolors
         self._linewidths = other._linewidths
         self._linestyles = other._linestyles
@@ -875,14 +916,14 @@ class PolyCollection(_CollectionWithSizes):
 
     def set_verts(self, verts, closed=True):
         '''This allows one to delay initialization of the vertices.'''
-        if np.ma.isMaskedArray(verts):
-            verts = verts.astype(np.float_).filled(np.nan)
+        if isinstance(verts, np.ma.MaskedArray):
+            verts = verts.astype(float).filled(np.nan)
             # This is much faster than having Path do it one at a time.
         if closed:
             self._paths = []
             for xy in verts:
                 if len(xy):
-                    if np.ma.isMaskedArray(xy):
+                    if isinstance(xy, np.ma.MaskedArray):
                         xy = np.ma.concatenate([xy, xy[0:1]])
                     else:
                         xy = np.asarray(xy)
@@ -1137,7 +1178,7 @@ class LineCollection(Collection):
         if antialiaseds is None:
             antialiaseds = (mpl.rcParams['lines.antialiased'],)
 
-        colors = mcolors.colorConverter.to_rgba_array(colors)
+        colors = mcolors.to_rgba_array(colors)
 
         Collection.__init__(
             self,
@@ -1162,8 +1203,8 @@ class LineCollection(Collection):
         _segments = []
 
         for seg in segments:
-            if not np.ma.isMaskedArray(seg):
-                seg = np.asarray(seg, np.float_)
+            if not isinstance(seg, np.ma.MaskedArray):
+                seg = np.asarray(seg, float)
             _segments.append(seg)
 
         if self._uniform_offsets is not None:
@@ -1742,18 +1783,15 @@ class QuadMesh(Collection):
         Collection.__init__(self, **kwargs)
         self._meshWidth = meshWidth
         self._meshHeight = meshHeight
-        self._coordinates = coordinates
+        # By converting to floats now, we can avoid that on every draw.
+        self._coordinates = np.asarray(coordinates, float).reshape(
+            (meshHeight + 1, meshWidth + 1, 2))
         self._antialiased = antialiased
         self._shading = shading
 
         self._bbox = transforms.Bbox.unit()
         self._bbox.update_from_data_xy(coordinates.reshape(
             ((meshWidth + 1) * (meshHeight + 1), 2)))
-
-        # By converting to floats now, we can avoid that on every draw.
-        self._coordinates = self._coordinates.reshape(
-            (meshHeight + 1, meshWidth + 1, 2))
-        self._coordinates = np.array(self._coordinates, np.float_)
 
     def get_paths(self):
         if self._paths is None:
@@ -1779,7 +1817,7 @@ class QuadMesh(Collection):
         """
         Path = mpath.Path
 
-        if ma.isMaskedArray(coordinates):
+        if isinstance(coordinates, np.ma.MaskedArray):
             c = coordinates.data
         else:
             c = coordinates
@@ -1800,7 +1838,7 @@ class QuadMesh(Collection):
         with its own color.  This is useful for experiments using
         `draw_qouraud_triangle`.
         """
-        if ma.isMaskedArray(coordinates):
+        if isinstance(coordinates, np.ma.MaskedArray):
             p = coordinates.data
         else:
             p = coordinates
@@ -1851,7 +1889,7 @@ class QuadMesh(Collection):
                 ys = self.convert_yunits(self._offsets[:, 1])
                 offsets = list(zip(xs, ys))
 
-        offsets = np.asarray(offsets, np.float_)
+        offsets = np.asarray(offsets, float)
         offsets.shape = (-1, 2)                 # Make it Nx2
 
         self.update_scalarmappable()

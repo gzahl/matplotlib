@@ -1,6 +1,11 @@
 """
+==================
+Animated histogram
+==================
+
 This example shows how to use a path patch to draw a bunch of
-rectangles for an animated histogram
+rectangles for an animated histogram.
+
 """
 import numpy as np
 
@@ -10,6 +15,9 @@ import matplotlib.path as path
 import matplotlib.animation as animation
 
 fig, ax = plt.subplots()
+
+# Fixing random state for reproducibility
+np.random.seed(19680801)
 
 # histogram our data with numpy
 data = np.random.randn(1000)

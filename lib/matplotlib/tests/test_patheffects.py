@@ -1,7 +1,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
+import six
 
 import numpy as np
 
@@ -16,9 +16,6 @@ try:
 except ImportError:
     import mock
 from nose.tools import assert_equal
-
-import sys
-on_win = (sys.platform == 'win32')
 
 
 @image_comparison(baseline_images=['patheffect1'], remove_text=True)
@@ -113,7 +110,7 @@ def test_SimplePatchShadow_offset():
     assert_equal(pe._offset, (4, 5))
 
 
-@image_comparison(baseline_images=['collection'], tol=0.013 if on_win else 0)
+@image_comparison(baseline_images=['collection'], tol=0.015)
 def test_collection():
     x, y = np.meshgrid(np.linspace(0, 10, 150), np.linspace(-5, 5, 100))
     data = np.sin(x) + np.cos(y)

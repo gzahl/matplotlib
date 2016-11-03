@@ -5,7 +5,7 @@ Provides a collection of utilities for comparing (image) results.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
+import six
 
 import hashlib
 import os
@@ -99,6 +99,14 @@ def get_file_hash(path, block_size=2 ** 20):
             if not data:
                 break
             md5.update(data)
+
+    if path.endswith('.pdf'):
+        from matplotlib import checkdep_ghostscript
+        md5.update(checkdep_ghostscript()[1].encode('utf-8'))
+    elif path.endswith('.svg'):
+        from matplotlib import checkdep_inkscape
+        md5.update(checkdep_inkscape().encode('utf-8'))
+
     return md5.hexdigest()
 
 
@@ -242,21 +250,15 @@ def crop_to_same(actual_path, actual_image, expected_path, expected_image):
 
 def calculate_rms(expectedImage, actualImage):
     "Calculate the per-pixel errors, then compute the root mean square error."
+    if expectedImage.shape != actualImage.shape:
+        raise ImageComparisonFailure(
+            "image sizes do not match expected size: {0} "
+            "actual size {1}".format(expectedImage.shape, actualImage.shape))
     num_values = np.prod(expectedImage.shape)
     abs_diff_image = abs(expectedImage - actualImage)
-
-    # On Numpy 1.6, we can use bincount with minlength, which is much
-    # faster than using histogram
-    expected_version = version.LooseVersion("1.6")
-    found_version = version.LooseVersion(np.__version__)
-    if found_version >= expected_version:
-        histogram = np.bincount(abs_diff_image.ravel(), minlength=256)
-    else:
-        histogram = np.histogram(abs_diff_image, bins=np.arange(257))[0]
-
+    histogram = np.bincount(abs_diff_image.ravel(), minlength=256)
     sum_of_squares = np.sum(histogram * np.arange(len(histogram)) ** 2)
     rms = np.sqrt(float(sum_of_squares) / num_values)
-
     return rms
 
 
@@ -356,8 +358,8 @@ def save_diff_image(expected, actual, output):
     actualImage = _png.read_png(actual)
     actualImage, expectedImage = crop_to_same(
         actual, actualImage, expected, expectedImage)
-    expectedImage = np.array(expectedImage).astype(np.float)
-    actualImage = np.array(actualImage).astype(np.float)
+    expectedImage = np.array(expectedImage).astype(float)
+    actualImage = np.array(actualImage).astype(float)
     assert expectedImage.ndim == actualImage.ndim
     assert expectedImage.shape == actualImage.shape
     absDiffImage = abs(expectedImage - actualImage)

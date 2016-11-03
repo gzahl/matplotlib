@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """ toggle between two images by pressing "t"
 
 The basic idea is to load two images (they can be different shapes) and plot
@@ -19,6 +18,10 @@ If you know how to fix this, please email us!
 
 import matplotlib.pyplot as plt
 import numpy as np
+
+# Fixing random state for reproducibility
+np.random.seed(19680801)
+
 
 # two images x1 is initially visible, x2 is not
 x1 = np.random.random((100, 100))

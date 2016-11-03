@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 Show how to use an rrule instance to make a custom date ticker - here
 we put a tick mark on every 5th easter
@@ -9,6 +8,10 @@ import matplotlib.pyplot as plt
 from matplotlib.dates import YEARLY, DateFormatter, rrulewrapper, RRuleLocator, drange
 import numpy as np
 import datetime
+
+# Fixing random state for reproducibility
+np.random.seed(19680801)
+
 
 # tick every 5th easter
 rule = rrulewrapper(YEARLY, byeaster=1, interval=5)

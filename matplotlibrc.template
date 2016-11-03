@@ -30,7 +30,7 @@
 #### CONFIGURATION BEGINS HERE
 
 # The default backend; one of GTK GTKAgg GTKCairo GTK3Agg GTK3Cairo
-# CocoaAgg MacOSX Qt4Agg Qt5Agg TkAgg WX WXAgg Agg Cairo GDK PS PDF SVG
+# MacOSX Qt4Agg Qt5Agg TkAgg WX WXAgg Agg Cairo GDK PS PDF SVG
 # Template.
 # You can also deploy your own backend outside of matplotlib by
 # referring to the module name (which must be in the PYTHONPATH) as
@@ -78,9 +78,9 @@ backend      : $TEMPLATE_BACKEND
 ### LINES
 # See http://matplotlib.org/api/artist_api.html#module-matplotlib.lines for more
 # information on line properties.
-#lines.linewidth   : 2.0     # line width in points
+#lines.linewidth   : 1.5     # line width in points
 #lines.linestyle   : -       # solid line
-#lines.color       : blue    # has no affect on plot(); see axes.prop_cycle
+#lines.color       : C0      # has no affect on plot(); see axes.prop_cycle
 #lines.marker      : None    # the default marker
 #lines.markeredgewidth  : 1.0     # the line width around the marker symbol
 #lines.markersize  : 6            # markersize, in points
@@ -93,7 +93,8 @@ backend      : $TEMPLATE_BACKEND
 # The three standard dash patterns.  These are scaled by the linewidth.
 #lines.dashed_pattern : 2.8, 1.2
 #lines.dashdot_pattern : 4.8, 1.2, 0.8, 1.2
-#lines.dotted_pattern : 1.2, 0.6
+#lines.dotted_pattern : 1.1, 1.1
+#lines.scale_dashes : True
 
 #markers.fillstyle: full # full|left|right|bottom|top|none
 
@@ -102,17 +103,19 @@ backend      : $TEMPLATE_BACKEND
 # circles.  See
 # http://matplotlib.org/api/artist_api.html#module-matplotlib.patches
 # information on patch properties
-#patch.linewidth        : None     # edge width in points.
-                                   # If None, use axes.linewidth when patch
-                                   # is not filled.
-#patch.facecolor        : 1f77b4
-#patch.edgecolor        : black
+#patch.linewidth        : 1        # edge width in points.
+#patch.facecolor        : C0
+#patch.edgecolor        : black   # if forced, or patch is not filled
+#patch.force_edgecolor  : False   # True to always use edgecolor
 #patch.antialiased      : True    # render patches in antialiased (no jaggies)
+
+### HATCHES
+#hatch.linewidth : 1.0
 
 ### Boxplot
 #boxplot.notch       : False
 #boxplot.vertical    : True
-#boxplot.whiskers    : 1
+#boxplot.whiskers    : 1.5
 #boxplot.bootstrap   : None
 #boxplot.patchartist : False
 #boxplot.showmeans   : False
@@ -141,14 +144,14 @@ backend      : $TEMPLATE_BACKEND
 #boxplot.capprops.linewidth : 1.0
 #boxplot.capprops.linestyle : '-'
 
-#boxplot.medianprops.color     : 'b'
+#boxplot.medianprops.color     : 'C1'
 #boxplot.medianprops.linewidth : 1.0
 #boxplot.medianprops.linestyle : '-'
 
-#boxplot.meanprops.color           : 'b'
+#boxplot.meanprops.color           : 'C2'
 #boxplot.meanprops.marker          : '^'
-#boxplot.meanprops.markerfacecolor : 'b'
-#boxplot.meanprops.markeredgecolor : 'b'
+#boxplot.meanprops.markerfacecolor : 'C2'
+#boxplot.meanprops.markeredgecolor : 'C2'
 #boxplot.meanprops.markersize      :  6
 #boxplot.meanprops.linestyle       : 'none'
 #boxplot.meanprops.linewidth       : 1.0
@@ -187,7 +190,7 @@ backend      : $TEMPLATE_BACKEND
 # property is not currently implemented.
 #
 # The font.size property is the default font size for text, given in pts.
-# 12pt is the standard value.
+# 10 pt is the standard value.
 #
 #font.family         : sans-serif
 #font.style          : normal
@@ -199,11 +202,11 @@ backend      : $TEMPLATE_BACKEND
 # settings for axes and ticks. Special text sizes can be defined
 # relative to font.size, using the following values: xx-small, x-small,
 # small, medium, large, x-large, xx-large, larger, or smaller
-#font.size           : 12.0
+#font.size           : 10.0
 #font.serif          : DejaVu Serif, Bitstream Vera Serif, New Century Schoolbook, Century Schoolbook L, Utopia, ITC Bookman, Bookman, Nimbus Roman No9 L, Times New Roman, Times, Palatino, Charter, serif
 #font.sans-serif     : DejaVu Sans, Bitstream Vera Sans, Lucida Grande, Verdana, Geneva, Lucid, Arial, Helvetica, Avant Garde, sans-serif
 #font.cursive        : Apple Chancery, Textile, Zapf Chancery, Sand, Script MT, Felipa, cursive
-#font.fantasy        : Comic Sans MS, Chicago, Charcoal, Impact, Western, Humor Sans, fantasy
+#font.fantasy        : Comic Sans MS, Chicago, Charcoal, Impact, Western, Humor Sans, xkcd, fantasy
 #font.monospace      : DejaVu Sans Mono, Bitstream Vera Sans Mono, Andale Mono, Nimbus Mono L, Courier New, Courier, Fixed, Terminal, monospace
 
 ### TEXT
@@ -291,15 +294,17 @@ backend      : $TEMPLATE_BACKEND
 #axes.hold           : True    # whether to clear the axes by default on
 #axes.facecolor      : white   # axes background color
 #axes.edgecolor      : black   # axes edge color
-#axes.linewidth      : 1.0     # edge linewidth
+#axes.linewidth      : 0.8     # edge linewidth
 #axes.grid           : False   # display grid or not
 #axes.titlesize      : large   # fontsize of the axes title
+#axes.titlepad       : 4.0     # pad between axes and title in points
 #axes.labelsize      : medium  # fontsize of the x any y labels
-#axes.labelpad       : 5.0     # space between label and axis
+#axes.labelpad       : 4.0     # space between label and axis
 #axes.labelweight    : normal  # weight of the x and y labels
 #axes.labelcolor     : black
-#axes.axisbelow      : False   # whether axis gridlines and ticks are below
-                               # the axes elements (lines, text, etc)
+#axes.axisbelow      : 'line'  # draw axis gridlines and ticks below
+                               # patches (True); above patches but below
+                               # lines ('line'); or above all (False)
 
 #axes.formatter.limits : -7, 7 # use scientific notation if log10
                                # of the axis range is smaller than the
@@ -315,6 +320,12 @@ backend      : $TEMPLATE_BACKEND
                                          # to an offset when the data range is very
                                          # small compared to the minimum absolute
                                          # value of the data.
+
+
+# axes.spines.left   : True   # display axis spines
+# axes.spines.bottom : True
+# axes.spines.top    : True
+# axes.spines.right  : True
 
 
 #axes.unicode_minus  : True    # use unicode for the minus symbol
@@ -351,71 +362,79 @@ backend      : $TEMPLATE_BACKEND
 # date.autoformatter.day      : %Y-%m-%d
 # date.autoformatter.hour     : %H:%M
 # date.autoformatter.minute   : %H:%M:%S
-# date.autoformatter.second   : %H:%M:%S.%f
+# date.autoformatter.second   : %H:%M:%S
+# date.autoformatter.microsecond   : %H:%M:%S.%f
 
 ### TICKS
 # see http://matplotlib.org/api/axis_api.html#matplotlib.axis.Tick
-#xtick.top            : True   # draw ticks on the top side
+#xtick.top            : False   # draw ticks on the top side
 #xtick.bottom         : True   # draw ticks on the bottom side
-#xtick.major.size     : 4      # major tick size in points
+#xtick.major.size     : 3.5      # major tick size in points
 #xtick.minor.size     : 2      # minor tick size in points
-#xtick.major.width    : 1.0    # major tick width in points
-#xtick.minor.width    : 1.0    # minor tick width in points
-#xtick.major.pad      : 4      # distance to major tick label in points
-#xtick.minor.pad      : 4      # distance to the minor tick label in points
+#xtick.major.width    : 0.8    # major tick width in points
+#xtick.minor.width    : 0.6    # minor tick width in points
+#xtick.major.pad      : 3.5      # distance to major tick label in points
+#xtick.minor.pad      : 3.4      # distance to the minor tick label in points
 #xtick.color          : k      # color of the tick labels
 #xtick.labelsize      : medium # fontsize of the tick labels
 #xtick.direction      : out    # direction: in, out, or inout
 #xtick.minor.visible  : False  # visibility of minor ticks on x-axis
+#xtick.major.top      : True   # draw x axis top major ticks
+#xtick.major.bottom   : True   # draw x axis bottom major ticks
+#xtick.minor.top      : True   # draw x axis top minor ticks
+#xtick.minor.bottom   : True   # draw x axis bottom minor ticks
 
 #ytick.left           : True   # draw ticks on the left side
-#ytick.right          : True   # draw ticks on the right side
-#ytick.major.size     : 4      # major tick size in points
+#ytick.right          : False  # draw ticks on the right side
+#ytick.major.size     : 3.5      # major tick size in points
 #ytick.minor.size     : 2      # minor tick size in points
-#ytick.major.width    : 1.0    # major tick width in points
-#ytick.minor.width    : 1.0    # minor tick width in points
-#ytick.major.pad      : 4      # distance to major tick label in points
-#ytick.minor.pad      : 4      # distance to the minor tick label in points
+#ytick.major.width    : 0.8    # major tick width in points
+#ytick.minor.width    : 0.6    # minor tick width in points
+#ytick.major.pad      : 3.5      # distance to major tick label in points
+#ytick.minor.pad      : 3.4      # distance to the minor tick label in points
 #ytick.color          : k      # color of the tick labels
 #ytick.labelsize      : medium # fontsize of the tick labels
 #ytick.direction      : out    # direction: in, out, or inout
 #ytick.minor.visible  : False  # visibility of minor ticks on y-axis
+#xtick.major.left     : True   # draw y axis left major ticks
+#xtick.major.right    : True   # draw y axis right major ticks
+#xtick.minor.left     : True   # draw y axis left minor ticks
+#xtick.minor.right    : True   # draw y axis right minor ticks
 
 
 ### GRIDS
-#grid.color       :   b0b0b0 # grid color
+#grid.color       :   b0b0b0    # grid color
 #grid.linestyle   :   -         # solid
-#grid.linewidth   :   1.0       # in points
+#grid.linewidth   :   0.8       # in points
 #grid.alpha       :   1.0       # transparency, between 0.0 and 1.0
 
 ### Legend
-#legend.fancybox      : True  # if True, use a rounded box for the
-                              # legend, else a rectangle
 #legend.loc           : best
-#legend.isaxes        : True
-#legend.numpoints     : 1      # the number of points in the legend line
-#legend.fontsize      : large
-#legend.borderpad     : 0.5    # border whitespace in fontsize units
-#legend.markerscale   : 1.0    # the relative size of legend markers vs. original
-# the following dimensions are in axes coords
-#legend.labelspacing  : 0.5    # the vertical space between the legend entries in fraction of fontsize
-#legend.handlelength  : 2.     # the length of the legend lines in fraction of fontsize
-#legend.handleheight  : 0.7     # the height of the legend handle in fraction of fontsize
-#legend.handletextpad : 0.8    # the space between the legend line and legend text in fraction of fontsize
-#legend.borderaxespad : 0.5   # the border between the axes and legend edge in fraction of fontsize
-#legend.columnspacing : 2.    # the border between the axes and legend edge in fraction of fontsize
-#legend.shadow        : False
-#legend.frameon       : True   # whether or not to draw a frame around legend
-#legend.framealpha    : None    # opacity of of legend frame
-#legend.scatterpoints : 3 # number of scatter points
-#legend.facecolor     : inherit
-#legend.edgecolor     : k
+#legend.frameon       : True     # if True, draw the legend on a background patch
+#legend.framealpha    : 0.8      # legend patch transparency
+#legend.facecolor     : inherit  # inherit from axes.facecolor; or color spec
+#legend.edgecolor     : 0.8      # background patch boundary color
+#legend.fancybox      : True     # if True, use a rounded box for the
+                                 # legend background, else a rectangle
+#legend.shadow        : False    # if True, give background a shadow effect
+#legend.numpoints     : 1        # the number of marker points in the legend line
+#legend.scatterpoints : 1        # number of scatter points
+#legend.markerscale   : 1.0      # the relative size of legend markers vs. original
+#legend.fontsize      : medium
+# Dimensions as fraction of fontsize:
+#legend.borderpad     : 0.4      # border whitespace
+#legend.labelspacing  : 0.5      # the vertical space between the legend entries
+#legend.handlelength  : 2.0      # the length of the legend lines
+#legend.handleheight  : 0.7      # the height of the legend handle
+#legend.handletextpad : 0.8      # the space between the legend line and legend text
+#legend.borderaxespad : 0.5      # the border between the axes and legend edge
+#legend.columnspacing : 2.0      # column separation
 
 ### FIGURE
 # See http://matplotlib.org/api/figure_api.html#matplotlib.figure.Figure
-#figure.titlesize : medium     # size of the figure title
+#figure.titlesize : large      # size of the figure title (Figure.suptitle())
 #figure.titleweight : normal   # weight of the figure title
-#figure.figsize   : 8, 6    # figure size in inches
+#figure.figsize   : 6.4, 4.8   # figure size in inches
 #figure.dpi       : 100      # figure dots per inch
 #figure.facecolor : white   # figure facecolor; 0.75 is scalar gray
 #figure.edgecolor : white   # figure edgecolor
@@ -426,13 +445,13 @@ backend      : $TEMPLATE_BACKEND
                                # If less than one this feature is disabled.
 
 # The figure subplot parameters.  All dimensions are a fraction of the
-# figure width or height
 #figure.subplot.left    : 0.125  # the left side of the subplots of the figure
 #figure.subplot.right   : 0.9    # the right side of the subplots of the figure
-#figure.subplot.bottom  : 0.1    # the bottom of the subplots of the figure
-#figure.subplot.top     : 0.9    # the top of the subplots of the figure
+#figure.subplot.bottom  : 0.11    # the bottom of the subplots of the figure
+#figure.subplot.top     : 0.88    # the top of the subplots of the figure
 #figure.subplot.wspace  : 0.2    # the amount of width reserved for blank space between subplots
 #figure.subplot.hspace  : 0.2    # the amount of height reserved for white space between subplots
+
 
 ### IMAGES
 #image.aspect : equal             # equal | auto | a number
@@ -457,6 +476,9 @@ backend      : $TEMPLATE_BACKEND
 #hist.bins : 10                   # The default number of histogram bins.
                                   # If Numpy 1.11 or later is
                                   # installed, may also be `auto`
+
+### SCATTER PLOTS
+#scatter.marker : o               # The default marker type for scatter plots.
 
 ### Agg rendering
 ### Warning: experimental, 2008/10/10
@@ -568,7 +590,8 @@ backend      : $TEMPLATE_BACKEND
 #keymap.zoom : o                     # zoom mnemonic
 #keymap.save : s                     # saving current figure
 #keymap.quit : ctrl+w, cmd+w         # close the current figure
-#keymap.grid : g                     # switching on/off a grid in current axes
+#keymap.grid : g                     # switching on/off major grids in current axes
+#keymap.grid_minor : G               # switching on/off minor grids in current axes
 #keymap.yscale : l                   # toggle scaling of y-axes ('log'/'linear')
 #keymap.xscale : L, k                # toggle scaling of x-axes ('log'/'linear')
 #keymap.all_axes : a                 # enable all axes
@@ -581,7 +604,7 @@ backend      : $TEMPLATE_BACKEND
                                    # the IPython notebook. 'html5' uses
                                    # HTML5 video tag.
 #animation.writer : ffmpeg         # MovieWriter 'backend' to use
-#animation.codec : mpeg4           # Codec to use for writing movie
+#animation.codec : h264            # Codec to use for writing movie
 #animation.bitrate: -1             # Controls size/quality tradeoff for movie.
                                    # -1 implies let utility auto-determine
 #animation.frame_format: 'png'     # Controls frame format used by temp files

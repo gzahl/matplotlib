@@ -22,8 +22,8 @@ License   : matplotlib license
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
-from matplotlib.externals.six.moves import xrange
+import six
+from six.moves import xrange
 
 import warnings
 
@@ -278,8 +278,6 @@ class Table(Artist):
 
         self.set_clip_on(False)
 
-        self._cachedRenderer = None
-
     def add_cell(self, row, col, *args, **kwargs):
         """ Add a cell to the table. """
         xy = (0, 0)
@@ -310,10 +308,9 @@ class Table(Artist):
         # Need a renderer to do hit tests on mouseevent; assume the last one
         # will do
         if renderer is None:
-            renderer = self._cachedRenderer
+            renderer = self.figure._cachedRenderer
         if renderer is None:
             raise RuntimeError('No renderer defined')
-        self._cachedRenderer = renderer
 
         if not self.get_visible():
             return
@@ -350,8 +347,9 @@ class Table(Artist):
 
         # TODO: Return index of the cell containing the cursor so that the user
         # doesn't have to bind to each one individually.
-        if self._cachedRenderer is not None:
-            boxes = [self._cells[pos].get_window_extent(self._cachedRenderer)
+        renderer = self.figure._cachedRenderer
+        if renderer is not None:
+            boxes = [self._cells[pos].get_window_extent(renderer)
                      for pos in six.iterkeys(self._cells)
                      if pos[0] >= 0 and pos[1] >= 0]
             bbox = Bbox.union(boxes)
@@ -409,8 +407,36 @@ class Table(Artist):
             cell.set_y(bottoms[row])
 
     def auto_set_column_width(self, col):
+        """ Given column indexs in either List, Tuple or int. Will be able to
+        automatically set the columns into optimal sizes.
 
-        self._autoColumns.append(col)
+        Here is the example of the input, which triger automatic adjustment on
+        columns to optimal size by given index numbers.
+        -1: the row labling
+        0: the 1st column
+        1: the 2nd column
+
+        Args:
+            col(List): list of indexs
+            >>>table.auto_set_column_width([-1,0,1])
+
+            col(Tuple): tuple of indexs
+            >>>table.auto_set_column_width((-1,0,1))
+
+            col(int): index integer
+            >>>table.auto_set_column_width(-1)
+            >>>table.auto_set_column_width(0)
+            >>>table.auto_set_column_width(1)
+        """
+        # check for col possibility on iteration
+        try:
+            iter(col)
+        except (TypeError, AttributeError):
+            self._autoColumns.append(col)
+        else:
+            for cell in col:
+                self._autoColumns.append(cell)
+
         self.stale = True
 
     def _auto_set_column_width(self, col, renderer):

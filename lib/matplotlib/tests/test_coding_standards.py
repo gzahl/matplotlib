@@ -6,7 +6,7 @@ import os
 
 from nose.tools import assert_equal
 from nose.plugins.skip import SkipTest
-from matplotlib.testing.noseclasses import KnownFailureTest
+from ..testing import xfail
 
 try:
     import pep8
@@ -100,6 +100,7 @@ def assert_pep8_conformance(module=matplotlib, exclude_files=None,
     The file should be a line separated list of filenames/directories
     as can be passed to the "pep8" tool's exclude list.
     """
+    __tracebackhide__ = True
 
     if not HAS_PEP8:
         raise SkipTest('The pep8 tool is required for this test')
@@ -156,8 +157,9 @@ def assert_pep8_conformance(module=matplotlib, exclude_files=None,
 
 
 def test_pep8_conformance_installed_files():
-    exclude_files = ['_delaunay.py',
-                     '_image.py',
+    __tracebackhide__ = True
+
+    exclude_files = ['_image.py',
                      '_tri.py',
                      '_backend_agg.py',
                      '_tkagg.py',
@@ -191,7 +193,6 @@ def test_pep8_conformance_installed_files():
                           'texmanager.py',
                           'transforms.py',
                           'type1font.py',
-                          'widgets.py',
                           'testing/decorators.py',
                           'testing/jpl_units/Duration.py',
                           'testing/jpl_units/Epoch.py',
@@ -204,7 +205,6 @@ def test_pep8_conformance_installed_files():
                           'tri/triinterpolate.py',
                           'tests/test_axes.py',
                           'tests/test_bbox_tight.py',
-                          'tests/test_delaunay.py',
                           'tests/test_image.py',
                           'tests/test_legend.py',
                           'tests/test_lines.py',
@@ -215,10 +215,8 @@ def test_pep8_conformance_installed_files():
                           'tests/test_subplots.py',
                           'tests/test_tightlayout.py',
                           'tests/test_triangulation.py',
-                          'compat/subprocess.py',
                           'backends/backend_agg.py',
                           'backends/backend_cairo.py',
-                          'backends/backend_cocoaagg.py',
                           'backends/backend_gdk.py',
                           'backends/backend_gtk.py',
                           'backends/backend_gtk3.py',
@@ -239,8 +237,7 @@ def test_pep8_conformance_installed_files():
                           'sphinxext/plot_directive.py',
                           'projections/__init__.py',
                           'projections/geo.py',
-                          'projections/polar.py',
-                          'externals/six.py']
+                          'projections/polar.py']
     expected_bad_files = ['*/matplotlib/' + s for s in expected_bad_files]
     assert_pep8_conformance(module=matplotlib,
                             exclude_files=exclude_files,
@@ -259,9 +256,8 @@ def test_pep8_conformance_examples():
             fp, tail = os.path.split(fp)
 
     if mpldir is None:
-        raise KnownFailureTest("can not find the examples, set env "
-                               "MPL_REPO_DIR to point to the top-level path "
-                               "of the source tree")
+        xfail("can not find the examples, set env MPL_REPO_DIR to point "
+              "to the top-level path of the source tree")
 
     exdir = os.path.join(mpldir, 'examples')
     blacklist = ()

@@ -1,14 +1,16 @@
-#!/usr/bin/env python
-# -*- Coding:utf-8 -*-
-'''Plot two curves, then use EventCollections to mark the locations of the x
-and y data points on the respective axes for each curve'''
+'''
+Plot two curves, then use EventCollections to mark the locations of the x
+and y data points on the respective axes for each curve
+'''
 
 import matplotlib.pyplot as plt
 from matplotlib.collections import EventCollection
 import numpy as np
 
+# Fixing random state for reproducibility
+np.random.seed(19680801)
+
 # create random data
-np.random.seed(50)
 xdata = np.random.random([2, 10])
 
 # split the data into two parts

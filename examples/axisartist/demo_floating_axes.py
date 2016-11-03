@@ -1,3 +1,15 @@
+"""
+Demo of the floating axes.
+
+This demo shows features of functions in floating_axes:
+    * Using scatter function and bar function with changing the
+      shape of the plot.
+    * Using GridHelperCurveLinear to rotate the plot and set the
+      boundary of the plot.
+    * Using FloatingSubplot to create a subplot using the return
+      value from GridHelperCurveLinear.
+    * Making sector plot by adding more features to GridHelperCurveLinear.
+"""
 from matplotlib.transforms import Affine2D
 import mpl_toolkits.axisartist.floating_axes as floating_axes
 import numpy as np
@@ -6,6 +18,9 @@ from matplotlib.projections import PolarAxes
 from mpl_toolkits.axisartist.grid_finder import (FixedLocator, MaxNLocator,
                                                  DictFormatter)
 import matplotlib.pyplot as plt
+
+# Fixing random state for reproducibility
+np.random.seed(19680801)
 
 
 def setup_axes1(fig, rect):
@@ -84,7 +99,9 @@ def setup_axes3(fig, rect):
 
     grid_locator2 = MaxNLocator(3)
 
+    # Specify theta limits in degrees
     ra0, ra1 = 8.*15, 14.*15
+    # Specify radial limits
     cz0, cz1 = 0, 14000
     grid_helper = floating_axes.GridHelperCurveLinear(
         tr, extremes=(ra0, ra1, cz0, cz1),

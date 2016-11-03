@@ -10,31 +10,34 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
+import six
 
 import os.path as osp
+import re
 
+import matplotlib
+from matplotlib import cm, markers, colors as mcolors
 import matplotlib.backends.qt_editor.formlayout as formlayout
 from matplotlib.backends.qt_compat import QtGui
-from matplotlib import cm, markers
-from matplotlib.colors import colorConverter, rgb2hex
 
 
 def get_icon(name):
-    import matplotlib
     basedir = osp.join(matplotlib.rcParams['datapath'], 'images')
     return QtGui.QIcon(osp.join(basedir, name))
+
 
 LINESTYLES = {'-': 'Solid',
               '--': 'Dashed',
               '-.': 'DashDot',
               ':': 'Dotted',
-              'none': 'None',
+              'None': 'None',
               }
 
-DRAWSTYLES = {'default': 'Default',
-              'steps': 'Steps',
-              }
+DRAWSTYLES = {
+    'default': 'Default',
+    'steps-pre': 'Steps (Pre)', 'steps': 'Steps (Pre)',
+    'steps-mid': 'Steps (Mid)',
+    'steps-post': 'Steps (Post)'}
 
 MARKERS = markers.MarkerStyle.markers
 
@@ -66,6 +69,14 @@ def figure_edit(axes, parent=None):
     yconverter = axes.yaxis.converter
     xunits = axes.xaxis.get_units()
     yunits = axes.yaxis.get_units()
+
+    # Sorting for default labels (_lineXXX, _imageXXX).
+    def cmp_key(label):
+        match = re.match(r"(_line|_image)(\d+)", label)
+        if match:
+            return match.group(1), int(match.group(2))
+        else:
+            return label, 0
 
     # Get / Curves
     linedict = {}
@@ -100,26 +111,28 @@ def figure_edit(axes, parent=None):
                 sorted(short2name.items(),
                        key=lambda short_and_name: short_and_name[1]))
 
-    curvelabels = sorted(linedict.keys())
+    curvelabels = sorted(linedict, key=cmp_key)
     for label in curvelabels:
         line = linedict[label]
-        color = rgb2hex(colorConverter.to_rgb(line.get_color()))
-        ec = rgb2hex(colorConverter.to_rgb(line.get_markeredgecolor()))
-        fc = rgb2hex(colorConverter.to_rgb(line.get_markerfacecolor()))
+        color = mcolors.to_hex(
+            mcolors.to_rgba(line.get_color(), line.get_alpha()),
+            keep_alpha=True)
+        ec = mcolors.to_hex(line.get_markeredgecolor(), keep_alpha=True)
+        fc = mcolors.to_hex(line.get_markerfacecolor(), keep_alpha=True)
         curvedata = [
             ('Label', label),
             sep,
             (None, '<b>Line</b>'),
-            ('Line Style', prepare_data(LINESTYLES, line.get_linestyle())),
-            ('Draw Style', prepare_data(DRAWSTYLES, line.get_drawstyle())),
+            ('Line style', prepare_data(LINESTYLES, line.get_linestyle())),
+            ('Draw style', prepare_data(DRAWSTYLES, line.get_drawstyle())),
             ('Width', line.get_linewidth()),
-            ('Color', color),
+            ('Color (RGBA)', color),
             sep,
             (None, '<b>Marker</b>'),
             ('Style', prepare_data(MARKERS, line.get_marker())),
             ('Size', line.get_markersize()),
-            ('Facecolor', fc),
-            ('Edgecolor', ec)]
+            ('Face color (RGBA)', fc),
+            ('Edge color (RGBA)', ec)]
         curves.append([curvedata, label, ""])
     # Is there a curve displayed?
     has_curve = bool(curves)
@@ -131,18 +144,23 @@ def figure_edit(axes, parent=None):
         if label == '_nolegend_':
             continue
         imagedict[label] = image
-    imagelabels = sorted(imagedict)
+    imagelabels = sorted(imagedict, key=cmp_key)
     images = []
     cmaps = [(cmap, name) for name, cmap in sorted(cm.cmap_d.items())]
     for label in imagelabels:
         image = imagedict[label]
         cmap = image.get_cmap()
-        if cmap not in cm.cmap_d:
+        if cmap not in cm.cmap_d.values():
             cmaps = [(cmap, cmap.name)] + cmaps
+        low, high = image.get_clim()
         imagedata = [
             ('Label', label),
-            ('Colormap', [cmap.name] + cmaps)
-        ]
+            ('Colormap', [cmap.name] + cmaps),
+            ('Min. value', low),
+            ('Max. value', high),
+            ('Interpolation',
+             [image.get_interpolation()]
+             + [(name, name) for name in sorted(image.iterpnames)])]
         images.append([imagedata, label, ""])
     # Is there an image displayed?
     has_image = bool(images)
@@ -164,8 +182,12 @@ def figure_edit(axes, parent=None):
         # Set / General
         (title, xmin, xmax, xlabel, xscale, ymin, ymax, ylabel, yscale,
          generate_legend) = general
-        axes.set_xscale(xscale)
-        axes.set_yscale(yscale)
+
+        if axes.get_xscale() != xscale:
+            axes.set_xscale(xscale)
+        if axes.get_yscale() != yscale:
+            axes.set_yscale(yscale)
+
         axes.set_title(title)
         axes.set_xlim(xmin, xmax)
         axes.set_xlabel(xlabel)
@@ -189,7 +211,9 @@ def figure_edit(axes, parent=None):
             line.set_linestyle(linestyle)
             line.set_drawstyle(drawstyle)
             line.set_linewidth(linewidth)
-            line.set_color(color)
+            rgba = mcolors.to_rgba(color)
+            line.set_alpha(None)
+            line.set_color(rgba)
             if marker is not 'none':
                 line.set_marker(marker)
                 line.set_markersize(markersize)
@@ -199,9 +223,11 @@ def figure_edit(axes, parent=None):
         # Set / Images
         for index, image_settings in enumerate(images):
             image = imagedict[imagelabels[index]]
-            label, cmap = image_settings
+            label, cmap, low, high, interpolation = image_settings
             image.set_label(label)
             image.set_cmap(cm.get_cmap(cmap))
+            image.set_clim(*sorted([low, high]))
+            image.set_interpolation(interpolation)
 
         # re-generate legend, if checkbox is checked
         if generate_legend:

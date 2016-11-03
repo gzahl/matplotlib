@@ -16,7 +16,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals.six.moves import xrange
+from six.moves import xrange
 
 import sys
 import os
@@ -35,7 +35,8 @@ from matplotlib.backend_bases import ShowBase
 from matplotlib.backend_bases import _has_pil
 
 from matplotlib._pylab_helpers import Gcf
-from matplotlib.cbook import is_string_like, is_writable_file_like
+from matplotlib.cbook import (is_string_like, is_writable_file_like,
+                              warn_deprecated)
 from matplotlib.figure import Figure
 from matplotlib.path import Path
 from matplotlib.transforms import Affine2D
@@ -188,6 +189,12 @@ class RendererWx(RendererBase):
         """
         Initialise a wxWindows renderer instance.
         """
+        warn_deprecated('2.0', message="The WX backend is "
+                        "deprecated. It's untested "
+                        "and will be removed in Matplotlib 2.2. "
+                        "Use the WXAgg backend instead. "
+                        "See Matplotlib usage FAQ for more info on backends.",
+                        alternative='WXAgg')
         RendererBase.__init__(self)
         DEBUG_MSG("__init__()", 1, self)
         self.width = bitmap.GetWidth()
@@ -456,19 +463,6 @@ class GraphicsContextWx(GraphicsContextBase):
         self.select()
         GraphicsContextBase.set_foreground(self, fg, isRGBA)
 
-        self._pen.SetColour(self.get_wxcolour(self.get_rgb()))
-        self.gfx_ctx.SetPen(self._pen)
-        self.unselect()
-
-    def set_graylevel(self, frac):
-        """
-        Set the foreground color.  fg can be a matlab format string, a
-        html hex color string, an rgb unit tuple, or a float between 0
-        and 1.  In the latter case, grayscale is used.
-        """
-        DEBUG_MSG("set_graylevel()", 1, self)
-        self.select()
-        GraphicsContextBase.set_graylevel(self, frac)
         self._pen.SetColour(self.get_wxcolour(self.get_rgb()))
         self.gfx_ctx.SetPen(self._pen)
         self.unselect()
@@ -763,10 +757,6 @@ class FigureCanvasWx(FigureCanvasBase, wx.Panel):
         confused with the main GUI event loop, which is always running
         and has nothing to do with this.
 
-        Call signature::
-
-        start_event_loop(self,timeout=0)
-
         This call blocks until a callback function triggers
         stop_event_loop() or *timeout* is reached.  If *timeout* is
         <=0, never timeout.
@@ -792,9 +782,6 @@ class FigureCanvasWx(FigureCanvasBase, wx.Panel):
         loop so that interactive functions, such as ginput and
         waitforbuttonpress, can wait for events.
 
-        Call signature::
-
-        stop_event_loop_default(self)
         """
         if hasattr(self, '_event_loop'):
             if self._event_loop.IsRunning():
@@ -983,7 +970,7 @@ class FigureCanvasWx(FigureCanvasBase, wx.Panel):
         dpival = self.figure.dpi
         winch = self._width / dpival
         hinch = self._height / dpival
-        self.figure.set_size_inches(winch, hinch)
+        self.figure.set_size_inches(winch, hinch, forward=False)
 
         # Rendering will happen on the associated paint event
         # so no need to do anything here except to make sure

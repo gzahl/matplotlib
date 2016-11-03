@@ -1,10 +1,9 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
+import six
 
 import functools
-import gc
 import inspect
 import os
 import sys
@@ -12,8 +11,10 @@ import shutil
 import warnings
 import unittest
 
-import nose
-import numpy as np
+# Note - don't import nose up here - import it only as needed in functions. This
+# allows other functions here to be used by pytest-based testing suites without
+# requiring nose to be installed.
+
 
 import matplotlib as mpl
 import matplotlib.style
@@ -23,14 +24,27 @@ from matplotlib import cbook
 from matplotlib import ticker
 from matplotlib import pyplot as plt
 from matplotlib import ft2font
-from matplotlib import rcParams
-from matplotlib.testing.noseclasses import KnownFailureTest, \
-     KnownFailureDidNotFailTest, ImageComparisonFailure
 from matplotlib.testing.compare import comparable_formats, compare_images, \
      make_test_filename
+from . import copy_metadata, is_called_from_pytest, xfail
+from .exceptions import ImageComparisonFailure
 
 
-def knownfailureif(fail_condition, msg=None, known_exception_class=None ):
+def skipif(condition, *args, **kwargs):
+    """Skip the given test function if eval(condition) results in a True
+    value.
+
+    Optionally specify a reason for better reporting.
+    """
+    if is_called_from_pytest():
+        import pytest
+        return pytest.mark.skipif(condition, *args, **kwargs)
+    else:
+        from .nose.decorators import skipif
+        return skipif(condition, *args, **kwargs)
+
+
+def knownfailureif(fail_condition, msg=None, known_exception_class=None):
     """
 
     Assume a will fail if *fail_condition* is True. *fail_condition*
@@ -42,37 +56,21 @@ def knownfailureif(fail_condition, msg=None, known_exception_class=None ):
     if the exception is an instance of this class. (Default = None)
 
     """
-    # based on numpy.testing.dec.knownfailureif
-    if msg is None:
-        msg = 'Test known to fail'
-    def known_fail_decorator(f):
-        # Local import to avoid a hard nose dependency and only incur the
-        # import time overhead at actual test-time.
-        import nose
-        def failer(*args, **kwargs):
-            try:
-                # Always run the test (to generate images).
-                result = f(*args, **kwargs)
-            except Exception as err:
-                if fail_condition:
-                    if known_exception_class is not None:
-                        if not isinstance(err,known_exception_class):
-                            # This is not the expected exception
-                            raise
-                    # (Keep the next ultra-long comment so in shows in console.)
-                    raise KnownFailureTest(msg) # An error here when running nose means that you don't have the matplotlib.testing.noseclasses:KnownFailure plugin in use.
-                else:
-                    raise
-            if fail_condition and fail_condition != 'indeterminate':
-                raise KnownFailureDidNotFailTest(msg)
-            return result
-        return nose.tools.make_decorator(f)(failer)
-    return known_fail_decorator
+    if is_called_from_pytest():
+        import pytest
+        if fail_condition == 'indeterminate':
+            fail_condition, strict = True, False
+        else:
+            fail_condition, strict = bool(fail_condition), True
+        return pytest.mark.xfail(condition=fail_condition, reason=msg,
+                                 raises=known_exception_class, strict=strict)
+    else:
+        from .nose.decorators import knownfailureif
+        return knownfailureif(fail_condition, msg, known_exception_class)
 
 
 def _do_cleanup(original_units_registry, original_settings):
     plt.close('all')
-    gc.collect()
 
     mpl.rcParams.clear()
     mpl.rcParams.update(original_settings)
@@ -176,104 +174,185 @@ def check_freetype_version(ver):
 
     return found >= ver[0] and found <= ver[1]
 
-class ImageComparisonTest(CleanupTest):
-    @classmethod
-    def setup_class(cls):
-        CleanupTest.setup_class()
-        cls._initial_settings = mpl.rcParams.copy()
+
+def checked_on_freetype_version(required_freetype_version):
+    if check_freetype_version(required_freetype_version):
+        return lambda f: f
+
+    reason = ("Mismatched version of freetype. "
+              "Test requires '%s', you have '%s'" %
+              (required_freetype_version, ft2font.__freetype_version__))
+    return knownfailureif('indeterminate', msg=reason,
+                          known_exception_class=ImageComparisonFailure)
+
+
+def remove_ticks_and_titles(figure):
+    figure.suptitle("")
+    null_formatter = ticker.NullFormatter()
+    for ax in figure.get_axes():
+        ax.set_title("")
+        ax.xaxis.set_major_formatter(null_formatter)
+        ax.xaxis.set_minor_formatter(null_formatter)
+        ax.yaxis.set_major_formatter(null_formatter)
+        ax.yaxis.set_minor_formatter(null_formatter)
         try:
-            matplotlib.style.use(cls._style)
+            ax.zaxis.set_major_formatter(null_formatter)
+            ax.zaxis.set_minor_formatter(null_formatter)
+        except AttributeError:
+            pass
+
+
+def raise_on_image_difference(expected, actual, tol):
+    __tracebackhide__ = True
+
+    err = compare_images(expected, actual, tol, in_decorator=True)
+
+    if not os.path.exists(expected):
+        raise ImageComparisonFailure('image does not exist: %s' % expected)
+
+    if err:
+        raise ImageComparisonFailure(
+            'images not close: %(actual)s vs. %(expected)s '
+            '(RMS %(rms).3f)' % err)
+
+
+def xfail_if_format_is_uncomparable(extension):
+    will_fail = extension not in comparable_formats()
+    if will_fail:
+        fail_msg = 'Cannot compare %s files on this system' % extension
+    else:
+        fail_msg = 'No failure expected'
+
+    return knownfailureif(will_fail, fail_msg,
+                          known_exception_class=ImageComparisonFailure)
+
+
+def mark_xfail_if_format_is_uncomparable(extension):
+    will_fail = extension not in comparable_formats()
+    if will_fail:
+        fail_msg = 'Cannot compare %s files on this system' % extension
+        import pytest
+        return pytest.mark.xfail(extension, reason=fail_msg, strict=False,
+                                 raises=ImageComparisonFailure)
+    else:
+        return extension
+
+
+class ImageComparisonDecorator(CleanupTest):
+    def __init__(self, baseline_images, extensions, tol,
+                 freetype_version, remove_text, savefig_kwargs, style):
+        self.func = self.baseline_dir = self.result_dir = None
+        self.baseline_images = baseline_images
+        self.extensions = extensions
+        self.tol = tol
+        self.freetype_version = freetype_version
+        self.remove_text = remove_text
+        self.savefig_kwargs = savefig_kwargs
+        self.style = style
+
+    def delayed_init(self, func):
+        assert callable(func), "func must be callable"
+        assert self.func is None, "it looks like same decorator used twice"
+        self.func = func
+        self.baseline_dir, self.result_dir = _image_directories(func)
+
+    def setup(self):
+        func = self.func
+        self.setup_class()
+        try:
+            matplotlib.style.use(self.style)
+            matplotlib.testing.set_font_settings_for_testing()
+            func()
+            assert len(plt.get_fignums()) == len(self.baseline_images), (
+                'Figures and baseline_images count are not the same'
+                ' (`%s`)' % getattr(func, '__qualname__', func.__name__))
         except:
             # Restore original settings before raising errors during the update.
-            mpl.rcParams.clear()
-            mpl.rcParams.update(cls._initial_settings)
+            self.teardown_class()
             raise
-        cls.original_settings = cls._initial_settings
-        matplotlib.testing.set_font_settings_for_testing()
-        cls._func()
 
-    @classmethod
-    def teardown_class(cls):
-        CleanupTest.teardown_class()
+    def teardown(self):
+        self.teardown_class()
 
-    @staticmethod
-    def remove_text(figure):
-        figure.suptitle("")
-        for ax in figure.get_axes():
-            ax.set_title("")
-            ax.xaxis.set_major_formatter(ticker.NullFormatter())
-            ax.xaxis.set_minor_formatter(ticker.NullFormatter())
-            ax.yaxis.set_major_formatter(ticker.NullFormatter())
-            ax.yaxis.set_minor_formatter(ticker.NullFormatter())
-            try:
-                ax.zaxis.set_major_formatter(ticker.NullFormatter())
-                ax.zaxis.set_minor_formatter(ticker.NullFormatter())
-            except AttributeError:
-                pass
+    def copy_baseline(self, baseline, extension):
+        baseline_path = os.path.join(self.baseline_dir, baseline)
+        orig_expected_fname = baseline_path + '.' + extension
+        if extension == 'eps' and not os.path.exists(orig_expected_fname):
+            orig_expected_fname = baseline_path + '.pdf'
+        expected_fname = make_test_filename(os.path.join(
+            self.result_dir, os.path.basename(orig_expected_fname)), 'expected')
+        if os.path.exists(orig_expected_fname):
+            shutil.copyfile(orig_expected_fname, expected_fname)
+        else:
+            xfail("Do not have baseline image {0} because this "
+                  "file does not exist: {1}".format(expected_fname,
+                                                    orig_expected_fname))
+        return expected_fname
 
-    def test(self):
-        baseline_dir, result_dir = _image_directories(self._func)
+    def compare(self, idx, baseline, extension):
+        __tracebackhide__ = True
+        fignum = plt.get_fignums()[idx]
+        fig = plt.figure(fignum)
 
-        for fignum, baseline in zip(plt.get_fignums(), self._baseline_images):
-            for extension in self._extensions:
-                will_fail = not extension in comparable_formats()
-                if will_fail:
-                    fail_msg = 'Cannot compare %s files on this system' % extension
-                else:
-                    fail_msg = 'No failure expected'
+        if self.remove_text:
+            remove_ticks_and_titles(fig)
 
-                orig_expected_fname = os.path.join(baseline_dir, baseline) + '.' + extension
-                if extension == 'eps' and not os.path.exists(orig_expected_fname):
-                    orig_expected_fname = os.path.join(baseline_dir, baseline) + '.pdf'
-                expected_fname = make_test_filename(os.path.join(
-                    result_dir, os.path.basename(orig_expected_fname)), 'expected')
-                actual_fname = os.path.join(result_dir, baseline) + '.' + extension
-                if os.path.exists(orig_expected_fname):
-                    shutil.copyfile(orig_expected_fname, expected_fname)
-                else:
-                    will_fail = True
-                    fail_msg = 'Do not have baseline image %s' % expected_fname
+        actual_fname = os.path.join(self.result_dir, baseline) + '.' + extension
+        fig.savefig(actual_fname, **self.savefig_kwargs)
 
-                @knownfailureif(
-                    will_fail, fail_msg,
-                    known_exception_class=ImageComparisonFailure)
-                def do_test():
-                    figure = plt.figure(fignum)
+        expected_fname = self.copy_baseline(baseline, extension)
+        raise_on_image_difference(expected_fname, actual_fname, self.tol)
 
-                    if self._remove_text:
-                        self.remove_text(figure)
+    def nose_runner(self):
+        func = self.compare
+        func = checked_on_freetype_version(self.freetype_version)(func)
+        funcs = {extension: xfail_if_format_is_uncomparable(extension)(func)
+                 for extension in self.extensions}
+        for idx, baseline in enumerate(self.baseline_images):
+            for extension in self.extensions:
+                yield funcs[extension], idx, baseline, extension
 
-                    figure.savefig(actual_fname, **self._savefig_kwarg)
+    def pytest_runner(self):
+        from pytest import mark
 
-                    err = compare_images(expected_fname, actual_fname,
-                                         self._tol, in_decorator=True)
+        extensions = map(mark_xfail_if_format_is_uncomparable, self.extensions)
 
-                    try:
-                        if not os.path.exists(expected_fname):
-                            raise ImageComparisonFailure(
-                                'image does not exist: %s' % expected_fname)
+        @mark.parametrize("extension", extensions)
+        @mark.parametrize("idx,baseline", enumerate(self.baseline_images))
+        @checked_on_freetype_version(self.freetype_version)
+        def wrapper(idx, baseline, extension):
+            __tracebackhide__ = True
+            self.compare(idx, baseline, extension)
 
-                        if err:
-                            raise ImageComparisonFailure(
-                                'images not close: %(actual)s vs. %(expected)s '
-                                '(RMS %(rms).3f)'%err)
-                    except ImageComparisonFailure:
-                        if not check_freetype_version(self._freetype_version):
-                            raise KnownFailureTest(
-                                "Mismatched version of freetype.  Test requires '%s', you have '%s'" %
-                                (self._freetype_version, ft2font.__freetype_version__))
-                        raise
+        # sadly we cannot use fixture here because of visibility problems
+        # and for for obvious reason avoid `nose.tools.with_setup`
+        wrapper.setup, wrapper.teardown = self.setup, self.teardown
 
-                yield (do_test,)
+        return wrapper
+
+    def __call__(self, func):
+        self.delayed_init(func)
+        if is_called_from_pytest():
+            return copy_metadata(func, self.pytest_runner())
+        else:
+            import nose.tools
+
+            @nose.tools.with_setup(self.setup, self.teardown)
+            def runner_wrapper():
+                try:
+                    for case in self.nose_runner():
+                        yield case
+                except GeneratorExit:
+                    # nose bug...
+                    self.teardown()
+
+            return copy_metadata(func, runner_wrapper)
+
 
 def image_comparison(baseline_images=None, extensions=None, tol=0,
                      freetype_version=None, remove_text=False,
                      savefig_kwarg=None, style='classic'):
     """
-    call signature::
-
-      image_comparison(baseline_images=['my_figure'], extensions=None)
-
     Compare images generated by the test with those specified in
     *baseline_images*, which must correspond else an
     ImageComparisonFailure exception will be raised.
@@ -322,35 +401,11 @@ def image_comparison(baseline_images=None, extensions=None, tol=0,
         #default no kwargs to savefig
         savefig_kwarg = dict()
 
-    def compare_images_decorator(func):
-        # We want to run the setup function (the actual test function
-        # that generates the figure objects) only once for each type
-        # of output file.  The only way to achieve this with nose
-        # appears to be to create a test class with "setup_class" and
-        # "teardown_class" methods.  Creating a class instance doesn't
-        # work, so we use type() to actually create a class and fill
-        # it with the appropriate methods.
-        name = func.__name__
-        # For nose 1.0, we need to rename the test function to
-        # something without the word "test", or it will be run as
-        # well, outside of the context of our image comparison test
-        # generator.
-        func = staticmethod(func)
-        func.__get__(1).__name__ = str('_private')
-        new_class = type(
-            name,
-            (ImageComparisonTest,),
-            {'_func': func,
-             '_baseline_images': baseline_images,
-             '_extensions': extensions,
-             '_tol': tol,
-             '_freetype_version': freetype_version,
-             '_remove_text': remove_text,
-             '_savefig_kwarg': savefig_kwarg,
-             '_style': style})
+    return ImageComparisonDecorator(
+        baseline_images=baseline_images, extensions=extensions, tol=tol,
+        freetype_version=freetype_version, remove_text=remove_text,
+        savefig_kwargs=savefig_kwarg, style=style)
 
-        return new_class
-    return compare_images_decorator
 
 def _image_directories(func):
     """
@@ -413,6 +468,8 @@ def _image_directories(func):
 
 
 def switch_backend(backend):
+    # Local import to avoid a hard nose dependency and only incur the
+    # import time overhead at actual test-time.
     def switch_backend_decorator(func):
         def backend_switcher(*args, **kwargs):
             try:
@@ -424,7 +481,7 @@ def switch_backend(backend):
                 plt.switch_backend(prev_backend)
             return result
 
-        return nose.tools.make_decorator(func)(backend_switcher)
+        return copy_metadata(func, backend_switcher)
     return switch_backend_decorator
 
 
@@ -443,7 +500,6 @@ def skip_if_command_unavailable(cmd):
     try:
         check_output(cmd)
     except:
-        from nose import SkipTest
-        raise SkipTest('missing command: %s' % cmd[0])
+        return skipif(True, reason='missing command: %s' % cmd[0])
 
     return lambda f: f

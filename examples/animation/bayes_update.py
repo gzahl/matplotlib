@@ -1,3 +1,14 @@
+"""
+================
+The Bayes update
+================
+
+This animation displays the posterior estimate updates as it is refitted when
+new data arrives.
+The vertical line represents the theoretical value to which the plotted
+distribution should converge.
+"""
+
 # update a distribution based on new data.
 import numpy as np
 import matplotlib.pyplot as plt
@@ -39,6 +50,10 @@ class UpdateDist(object):
         y = ss.beta.pdf(self.x, self.success + 1, (i - self.success) + 1)
         self.line.set_data(self.x, y)
         return self.line,
+
+# Fixing random state for reproducibility
+np.random.seed(19680801)
+
 
 fig, ax = plt.subplots()
 ud = UpdateDist(ax, prob=0.7)

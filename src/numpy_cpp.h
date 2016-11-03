@@ -25,6 +25,16 @@
 #    undef _XOPEN_SOURCE
 #endif
 
+// Prevent multiple conflicting definitions of swab from stdlib.h and unistd.h
+#if defined(__sun) || defined(sun)
+#if defined(_XPG4)
+#undef _XPG4
+#endif
+#if defined(_XPG3)
+#undef _XPG3
+#endif
+#endif
+
 #include <Python.h>
 #include <numpy/ndarrayobject.h>
 
@@ -284,7 +294,7 @@ class array_view_accessors<AV, T, 2>
                                             self->m_strides[1] * j);
     }
 
-    sub_t operator[](npy_intp i) const
+    sub_t subarray(npy_intp i) const
     {
         const AVC *self = static_cast<const AVC *>(this);
 
@@ -318,7 +328,7 @@ class array_view_accessors<AV, T, 3>
                                             self->m_strides[1] * j + self->m_strides[2] * k);
     }
 
-    sub_t operator[](npy_intp i) const
+    sub_t subarray(npy_intp i) const
     {
         const AVC *self = static_cast<const AVC *>(this);
 
@@ -515,9 +525,16 @@ class array_view : public detail::array_view_accessors<array_view, T, ND>
         return (T *)m_data;
     }
 
+    // Return a new reference.
     PyObject *pyobj()
     {
         Py_XINCREF(m_arr);
+        return (PyObject *)m_arr;
+    }
+
+    // Steal a reference.
+    PyObject *pyobj_steal()
+    {
         return (PyObject *)m_arr;
     }
 

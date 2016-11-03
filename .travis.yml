@@ -1,9 +1,11 @@
+language: python
+
 sudo: false
 
 cache:
+  pip: true
   directories:
-    - $HOME/.ccache
-    - $HOME/.cache/pip
+    - $HOME/.ccache  # https://github.com/travis-ci/travis-ci/issues/5853
     - $HOME/.cache/matplotlib
 
 addons:
@@ -23,6 +25,8 @@ addons:
       - texlive-latex-recommended
       - texlive-xetex
       - graphviz
+      - libgeos-dev
+      - otf-freefont
 #     - fonts-humor-sans
 #    sources:
 #      - debian-sid
@@ -36,36 +40,70 @@ env:
     - secure: "dfjNqGKzQG5bu3FnDNwLG8H/C4QoieFo4PfFmZPdM2RY7WIzukwKFNT6kiDfOrpwt+2bR7FhzjOGlDECGtlGOtYPN8XuXGjhcP4a4IfakdbDfF+D3NPIpf5VlE6776k0VpvcZBTMYJKNFIMc7QPkOwjvNJ2aXyfe3hBuGlKJzQU="
     - BUILD_DOCS=false
     - NUMPY=numpy
+    - OPENBLAS_NUM_THREADS=1
     - PANDAS=
     - NPROC=2
     - TEST_ARGS=--no-pep8
     - NOSE_ARGS="--processes=$NPROC --process-timeout=300"
-
-language: python
+    - PYTEST_ARGS="-ra --timeout=300 --durations=25 --cov-report= --cov=lib" # -n $NPROC
+    - PYTHON_ARGS=
+    - DELETE_FONT_CACHE=
+    - USE_PYTEST=false
+    #- PYTHONHASHSEED=0  # Workaround for pytest-xdist flaky colletion order
+    #                    # https://github.com/pytest-dev/pytest/issues/920
+    #                    # https://github.com/pytest-dev/pytest/issues/1075
 
 matrix:
   include:
     - python: 2.7
       env: MOCK=mock NUMPY=numpy==1.6
     - python: 3.4
+      env: PYTHON_ARGS=-OO
     - python: 3.5
-      env: PANDAS=pandas NOSE_ARGS=--with-coverage
+      env: PANDAS=pandas NOSE_ARGS=--with-coverage DELETE_FONT_CACHE=1
     - python: 3.5
       env: TEST_ARGS=--pep8
     - python: 3.5
       env: BUILD_DOCS=true
+    - python: 3.5
+      env: USE_PYTEST=true PANDAS=pandas DELETE_FONT_CACHE=1 TEST_ARGS=
+    - python: "3.6-dev"
+      env: PRE=--pre
     - python: "nightly"
       env: PRE=--pre
+    - os: osx
+      osx_image: xcode7.3
+      language: generic  # https://github.com/travis-ci/travis-ci/issues/2312
+      env: MOCK=mock NOSE_ARGS=
+      cache:
+        # As for now travis caches only "$HOME/.cache/pip"
+        # https://docs.travis-ci.com/user/caching/#pip-cache
+        pip: false
+        directories:
+          - $HOME/Library/Caches/pip
+          # `cache` does not support `env`-like `global` so copy-paste from top
+          - $HOME/.ccache  # https://github.com/travis-ci/travis-ci/issues/5853
+          - $HOME/.cache/matplotlib
   allow_failures:
     - python: "nightly"
 
 before_install:
   - |
     # Install into our own pristine virtualenv
-    source ci/travis/travis_tools.sh
-    virtualenv --python=python venv
-    source venv/bin/activate
-    export PATH=/usr/lib/ccache:$PATH
+    if [[ $TRAVIS_OS_NAME != 'osx' ]]; then
+      pip install --upgrade virtualenv
+      python -m virtualenv venv
+      source venv/bin/activate
+      export PATH=/usr/lib/ccache:$PATH
+    else
+      brew update
+      brew tap homebrew/gui
+      brew install python libpng  ffmpeg imagemagick mplayer ccache
+      # We could install ghostscript and inkscape here to test svg and pdf
+      # but this makes the test time really long.
+      # brew install ghostscript inkscape
+      export PATH=/usr/local/opt/ccache/libexec:$PATH
+    fi
 
 install:
   - |
@@ -76,20 +114,15 @@ install:
     pip install --upgrade wheel
     pip install --upgrade setuptools
   - |
-    # Install dependencies
-    if [ -z "$PRE" ]; then
-        # Install only from travis wheelhouse
-        wheelhouse_pip_install $NUMPY $PANDAS;
-    else
-        # Fall back to pypi for non suported python versions
-        pip install $PRE $NUMPY $PANDAS;
-    fi
-    # Always install from pypi
-    pip install $PRE pep8 cycler coveralls coverage python-dateutil pyparsing!=2.0.4
-    pip install pillow sphinx!=1.3.0 $MOCK numpydoc ipython colorspacious
+    # Install dependencies from pypi
+    pip install $PRE python-dateutil $NUMPY pyparsing!=2.1.6 $PANDAS pep8 cycler coveralls coverage $MOCK
+    pip install $PRE -r doc-requirements.txt
+
     # Install nose from a build which has partial
     # support for python36 and suport for coverage output suppressing
     pip install git+https://github.com/jenshnielsen/nose.git@matplotlibnose
+    # pytest-cov>=2.3.1 due to https://github.com/pytest-dev/pytest-cov/issues/124
+    pip install $PRE pytest 'pytest-cov>=2.3.1' pytest-timeout pytest-xdist pytest-faulthandler
 
     # We manually install humor sans using the package from Ubuntu 14.10. Unfortunatly humor sans is not
     # availible in the Ubuntu version used by Travis but we can manually install the deb from a later
@@ -111,27 +144,42 @@ install:
   - |
     # Install matplotlib
     pip install -e .
+  - |
 
 script:
   # The number of processes is hardcoded, because using too many causes the
   # Travis VM to run out of memory (since so many copies of inkscape and
   # ghostscript are running at the same time).
   - |
-    echo Testing using $NPROC processes
-    echo The following args are passed to nose $NOSE_ARGS
+    echo Testing import of tkagg backend
+    MPLBACKEND="tkagg" python -c 'import matplotlib.pyplot as plt; print(plt.get_backend())'
     if [[ $BUILD_DOCS == false ]]; then
+      if [[ $DELETE_FONT_CACHE == 1 ]]; then
+        rm -rf ~/.cache/matplotlib
+      fi
       export MPL_REPO_DIR=$PWD  # needed for pep8-conformance test of the examples
-      gdb -return-child-result -batch -ex r -ex bt --args python tests.py $NOSE_ARGS $TEST_ARGS
+      if [[ $USE_PYTEST == false ]]; then
+        echo The following args are passed to nose $NOSE_ARGS
+        if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
+          python tests.py $NOSE_ARGS $TEST_ARGS
+        else
+          gdb -return-child-result -batch -ex r -ex bt --args python $PYTHON_ARGS tests.py $NOSE_ARGS $TEST_ARGS
+        fi
+      else
+        echo The following args are passed to pytest $PYTEST_ARGS
+        py.test $PYTEST_ARGS $TEST_ARGS
+      fi
     else
       cd doc
-      python make.py html --small --warningsaserrors
+      python make.py html -n 2
       # We don't build the LaTeX docs here, so linkchecker will complain
       touch build/html/Matplotlib.pdf
       # Linkchecker only works with python 2.7 for the time being
       deactivate
       source ~/virtualenv/python2.7/bin/activate
       pip install pip --upgrade
-      pip install linkchecker
+      # linkchecker is currently broken with requests 2.10.0 so force an earlier version
+      pip install $PRE requests==2.9.2 linkchecker
       linkchecker build/html/index.html
     fi
   - rm -rf $HOME/.cache/matplotlib/tex.cache
@@ -174,21 +222,6 @@ after_success:
     else
       echo "Will only deploy docs build from matplotlib master branch"
     fi
-    if [[ $TRAVIS_PULL_REQUEST == false ]] && \
-       [[ $TRAVIS_REPO_SLUG == 'matplotlib/matplotlib' ]] && \
-       [[ $TRAVIS_BRANCH == 'master' ]]; then
-      cd $TRAVIS_BUILD_DIR
-      python ci/travis/travis_after_all.py
-      export $(cat .to_export_back)
-      if [ "$BUILD_LEADER" = "YES" ]; then
-        if [ "$BUILD_AGGREGATE_STATUS" = "others_succeeded" ]; then
-          echo "All Succeeded! Triggering OSX build..."
-          ./ci/travis/build_children.sh
-        else
-          echo "Some Failed; no OSX build"
-        fi
-      fi
-    fi
-    if [[ $NOSE_ARGS="--with-coverage" ]]; then
+    if [[ $NOSE_ARGS =~ "--with-coverage" || $USE_PYTEST == true ]]; then
       coveralls
     fi

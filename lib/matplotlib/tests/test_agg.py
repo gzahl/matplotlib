@@ -1,7 +1,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
+import six
 
 import io
 import os
@@ -11,9 +11,12 @@ from distutils.version import LooseVersion as V
 import numpy as np
 from numpy.testing import assert_array_almost_equal
 
+from nose.tools import assert_raises
+
 from matplotlib.image import imread
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
+from matplotlib.testing import skip
 from matplotlib.testing.decorators import (
     cleanup, image_comparison, knownfailureif)
 from matplotlib import pyplot as plt
@@ -249,7 +252,7 @@ def test_agg_filter():
             return t2
 
     if V(np.__version__) < V('1.7.0'):
-        return
+        skip('Disabled on Numpy < 1.7.0')
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -288,6 +291,13 @@ def test_agg_filter():
 
     ax.xaxis.set_visible(False)
     ax.yaxis.set_visible(False)
+
+
+@cleanup
+def test_too_large_image():
+    fig = plt.figure(figsize=(300, 1000))
+    buff = io.BytesIO()
+    assert_raises(ValueError, fig.savefig, buff)
 
 
 if __name__ == "__main__":

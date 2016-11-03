@@ -20,8 +20,8 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
-from matplotlib.externals.six.moves import xrange, zip
+import six
+from six.moves import xrange, zip
 
 import os
 import platform
@@ -36,10 +36,11 @@ except ImportError:
 import abc
 import contextlib
 import tempfile
-from matplotlib.cbook import iterable, is_string_like
+import warnings
+from matplotlib.cbook import iterable, is_string_like, deprecated
 from matplotlib.compat import subprocess
 from matplotlib import verbose
-from matplotlib import rcParams, rcParamsDefault
+from matplotlib import rcParams, rcParamsDefault, rc_context
 
 # Process creation flag for subprocess to prevent it raising a terminal
 # window. See for example:
@@ -58,6 +59,12 @@ else:
 
 # (http://stackoverflow.com/questions/2940671/
 # how-to-encode-series-of-images-into-h264-using-x264-api-c-c )
+
+
+def adjusted_figsize(w, h, dpi, n):
+    wnew = int(w * dpi / n) * n / dpi
+    hnew = int(h * dpi / n) * n / dpi
+    return wnew, hnew
 
 
 # A registry for available MovieWriter classes
@@ -137,7 +144,7 @@ class AbstractMovieWriter(six.with_metaclass(abc.ABCMeta)):
     '''
 
     @abc.abstractmethod
-    def setup(self, fig, outfile, dpi, *args):
+    def setup(self, fig, outfile, dpi):
         '''
         Perform setup for writing the movie file.
 
@@ -163,13 +170,13 @@ class AbstractMovieWriter(six.with_metaclass(abc.ABCMeta)):
         'Finish any processing for writing the movie.'
 
     @contextlib.contextmanager
-    def saving(self, fig, outfile, dpi, *args):
+    def saving(self, fig, outfile, dpi, *args, **kwargs):
         '''
         Context manager to facilitate writing the movie file.
 
         All arguments are passed on to `setup`.
         '''
-        self.setup(fig, outfile, dpi, *args)
+        self.setup(fig, outfile, dpi, *args, **kwargs)
         yield
         self.finish()
 
@@ -192,6 +199,7 @@ class MovieWriter(AbstractMovieWriter):
     frame_format: string
         The format used in writing frame data, defaults to 'rgba'
     '''
+
     def __init__(self, fps=5, codec=None, bitrate=None, extra_args=None,
                  metadata=None):
         '''
@@ -210,8 +218,8 @@ class MovieWriter(AbstractMovieWriter):
             automatically by the underlying utility.
         extra_args: list of strings or None
             A list of extra string arguments to be passed to the underlying
-            movie utiltiy. The default is None, which passes the additional
-            argurments in the 'animation.extra_args' rcParam.
+            movie utility. The default is None, which passes the additional
+            arguments in the 'animation.extra_args' rcParam.
         metadata: dict of string:string or None
             A dictionary of keys and values for metadata to include in the
             output file. Some keys that may be of use include:
@@ -243,10 +251,22 @@ class MovieWriter(AbstractMovieWriter):
     @property
     def frame_size(self):
         'A tuple (width,height) in pixels of a movie frame.'
-        width_inches, height_inches = self.fig.get_size_inches()
-        return width_inches * self.dpi, height_inches * self.dpi
+        w, h = self.fig.get_size_inches()
+        return int(w * self.dpi), int(h * self.dpi)
 
-    def setup(self, fig, outfile, dpi, *args):
+    def _adjust_frame_size(self):
+        if self.codec == 'h264':
+            wo, ho = self.fig.get_size_inches()
+            w, h = adjusted_figsize(wo, ho, self.dpi, 2)
+            if not (wo, ho) == (w, h):
+                self.fig.set_size_inches(w, h, forward=True)
+                verbose.report('figure size (inches) has been adjusted '
+                               'from %s x %s to %s x %s' % (wo, ho, w, h),
+                               level='helpful')
+        verbose.report('frame size in pixels is %s x %s' % self.frame_size,
+                       level='debug')
+
+    def setup(self, fig, outfile, dpi):
         '''
         Perform setup for writing the movie file.
 
@@ -261,6 +281,7 @@ class MovieWriter(AbstractMovieWriter):
         self.outfile = outfile
         self.fig = fig
         self.dpi = dpi
+        self._adjust_frame_size()
 
         # Run here so that grab_frame() can write the data to a pipe. This
         # eliminates the need for temp files.
@@ -299,12 +320,14 @@ class MovieWriter(AbstractMovieWriter):
             # frame format and dpi.
             self.fig.savefig(self._frame_sink(), format=self.frame_format,
                              dpi=self.dpi, **savefig_kwargs)
-        except RuntimeError:
+        except (RuntimeError, IOError) as e:
             out, err = self._proc.communicate()
             verbose.report('MovieWriter -- Error '
                            'running proc:\n%s\n%s' % (out,
                                                       err), level='helpful')
-            raise
+            raise IOError('Error saving animation to file (cause: {0}) '
+                          'Stdout: {1} StdError: {2}. It may help to re-run '
+                          'with --verbose-debug.'.format(e, out, err))
 
     def _frame_sink(self):
         'Returns the place to which frames should be written.'
@@ -355,6 +378,7 @@ class MovieWriter(AbstractMovieWriter):
 
 class FileMovieWriter(MovieWriter):
     '`MovieWriter` subclass that handles writing to a file.'
+
     def __init__(self, *args, **kwargs):
         MovieWriter.__init__(self, *args, **kwargs)
         self.frame_format = rcParams['animation.frame_format']
@@ -380,6 +404,8 @@ class FileMovieWriter(MovieWriter):
         self.fig = fig
         self.outfile = outfile
         self.dpi = dpi
+        self._adjust_frame_size()
+
         self.clear_temp = clear_temp
         self.temp_prefix = frame_prefix
         self._frame_counter = 0  # used for generating sequential file names
@@ -435,10 +461,9 @@ class FileMovieWriter(MovieWriter):
         try:
             # Tell the figure to save its data to the sink, using the
             # frame format and dpi.
-            myframesink = self._frame_sink()
-            self.fig.savefig(myframesink, format=self.frame_format,
-                             dpi=self.dpi, **savefig_kwargs)
-            myframesink.close()
+            with self._frame_sink() as myframesink:
+                self.fig.savefig(myframesink, format=self.frame_format,
+                                 dpi=self.dpi, **savefig_kwargs)
 
         except RuntimeError:
             out, err = self._proc.communicate()
@@ -491,8 +516,6 @@ class FFMpegBase(object):
 
     @property
     def output_args(self):
-        # The %dk adds 'k' as a suffix so that ffmpeg treats our bitrate as in
-        # kbps
         args = ['-vcodec', self.codec]
         # For h264, the default format is yuv444p, which is not compatible
         # with quicktime (and others). Specifying yuv420p fixes playback on
@@ -500,6 +523,8 @@ class FFMpegBase(object):
         # OSX). Also fixes internet explorer. This is as of 2015/10/29.
         if self.codec == 'h264' and '-pix_fmt' not in self.extra_args:
             args.extend(['-pix_fmt', 'yuv420p'])
+        # The %dk adds 'k' as a suffix so that ffmpeg treats our bitrate as in
+        # kbps
         if self.bitrate > 0:
             args.extend(['-b', '%dk' % self.bitrate])
         if self.extra_args:
@@ -535,7 +560,7 @@ class FFMpegFileWriter(FileMovieWriter, FFMpegBase):
     def _args(self):
         # Returns the command line parameters for subprocess to use
         # ffmpeg to create a movie using a collection of temp images
-        return [self.bin_path(), '-r', str(self.fps),
+        return [self.bin_path(),  # -r option is not needed before -i option
                 '-i', self._base_temp_name(),
                 '-vframes', str(self._frame_counter),
                 '-r', str(self.fps)] + self.output_args
@@ -595,9 +620,20 @@ class MencoderBase(object):
         return args
 
 
-# Combine Mencoder options with pipe-based writing
+# The message must be a single line; internal newlines cause sphinx failure.
+mencoder_dep = ("Support for mencoder is only partially functional, "
+                "and will be removed entirely in 2.2. "
+                "Please use ffmpeg instead.")
+
+
 @writers.register('mencoder')
 class MencoderWriter(MovieWriter, MencoderBase):
+
+    @deprecated('2.0', message=mencoder_dep)
+    def __init__(self, *args, **kwargs):
+        with rc_context(rc={'animation.codec': 'mpeg4'}):
+            super(MencoderWriter, self).__init__(*args, **kwargs)
+
     def _args(self):
         # Returns the command line parameters for subprocess to use
         # mencoder to create a movie
@@ -611,6 +647,11 @@ class MencoderWriter(MovieWriter, MencoderBase):
 @writers.register('mencoder_file')
 class MencoderFileWriter(FileMovieWriter, MencoderBase):
     supported_formats = ['png', 'jpeg', 'tga', 'sgi']
+
+    @deprecated('2.0', message=mencoder_dep)
+    def __init__(self, *args, **kwargs):
+        with rc_context(rc={'animation.codec': 'mpeg4'}):
+            super(MencoderFileWriter, self).__init__(*args, **kwargs)
 
     def _args(self):
         # Returns the command line parameters for subprocess to use
@@ -639,7 +680,7 @@ class ImageMagickBase(object):
     def _init_from_registry(cls):
         if sys.platform != 'win32' or rcParams[cls.exec_key] != 'convert':
             return
-        from matplotlib.externals.six.moves import winreg
+        from six.moves import winreg
         for flag in (0, winreg.KEY_WOW64_32KEY, winreg.KEY_WOW64_64KEY):
             try:
                 hkey = winreg.OpenKeyEx(winreg.HKEY_LOCAL_MACHINE,
@@ -776,12 +817,27 @@ class Animation(object):
         'mencoder'.  If nothing is passed, the value of the rcparam
         `animation.writer` is used.
 
+        *dpi* controls the dots per inch for the movie frames. This combined
+        with the figure's size in inches controls the size of the movie.
+
+        *savefig_kwargs* is a dictionary containing keyword arguments to be
+        passed on to the 'savefig' command which is called repeatedly to save
+        the individual frames. This can be used to set tight bounding boxes,
+        for example.
+
+        *extra_anim* is a list of additional `Animation` objects that should
+        be included in the saved movie file. These need to be from the same
+        `matplotlib.Figure` instance. Also, animation frames will just be
+        simply combined, so there should be a 1:1 correspondence between
+        the frames from the different animations.
+
+        These remaining arguments are used to construct a :class:`MovieWriter`
+        instance when necessary and are only considered valid if *writer* is
+        not a :class:`MovieWriter` instance.
+
         *fps* is the frames per second in the movie. Defaults to None,
         which will use the animation's specified interval to set the frames
         per second.
-
-        *dpi* controls the dots per inch for the movie frames. This combined
-        with the figure's size in inches controls the size of the movie.
 
         *codec* is the video codec to be used. Not all codecs are supported
         by a given :class:`MovieWriter`. If none is given, this defaults to the
@@ -794,49 +850,29 @@ class Animation(object):
         `animation.bitrate`.
 
         *extra_args* is a list of extra string arguments to be passed to the
-        underlying movie utiltiy. The default is None, which passes the
-        additional argurments in the 'animation.extra_args' rcParam.
+        underlying movie utility. The default is None, which passes the
+        additional arguments in the 'animation.extra_args' rcParam.
 
         *metadata* is a dictionary of keys and values for metadata to include
         in the output file. Some keys that may be of use include:
         title, artist, genre, subject, copyright, srcform, comment.
-
-        *extra_anim* is a list of additional `Animation` objects that should
-        be included in the saved movie file. These need to be from the same
-        `matplotlib.Figure` instance. Also, animation frames will just be
-        simply combined, so there should be a 1:1 correspondence between
-        the frames from the different animations.
-
-        *savefig_kwargs* is a dictionary containing keyword arguments to be
-        passed on to the 'savefig' command which is called repeatedly to save
-        the individual frames. This can be used to set tight bounding boxes,
-        for example.
         '''
+        # If the writer is None, use the rc param to find the name of the one
+        # to use
+        if writer is None:
+            writer = rcParams['animation.writer']
+        elif (not is_string_like(writer) and
+                any(arg is not None
+                    for arg in (fps, codec, bitrate, extra_args, metadata))):
+            raise RuntimeError('Passing in values for arguments '
+                               'fps, codec, bitrate, extra_args, or metadata '
+                               'is not supported when writer is an existing '
+                               'MovieWriter instance. These should instead be '
+                               'passed as arguments when creating the '
+                               'MovieWriter instance.')
+
         if savefig_kwargs is None:
             savefig_kwargs = {}
-
-        # FIXME: Using 'bbox_inches' doesn't currently work with
-        # writers that pipe the data to the command because this
-        # requires a fixed frame size (see Ryan May's reply in this
-        # thread: [1]). Thus we drop the 'bbox_inches' argument if it
-        # exists in savefig_kwargs.
-        #
-        # [1] (http://matplotlib.1069221.n5.nabble.com/
-        # Animation-class-let-save-accept-kwargs-which-
-        # are-passed-on-to-savefig-td39627.html)
-        #
-        if 'bbox_inches' in savefig_kwargs:
-            if not (writer in ['ffmpeg_file', 'mencoder_file'] or
-                    isinstance(writer,
-                               (FFMpegFileWriter, MencoderFileWriter))):
-                print("Warning: discarding the 'bbox_inches' argument in "
-                      "'savefig_kwargs' as it is only currently supported "
-                      "with the writers 'ffmpeg_file' and 'mencoder_file' "
-                      "(writer used: "
-                      "'{0}').".format(
-                          writer if isinstance(writer, six.string_types)
-                          else writer.__class__.__name__))
-                savefig_kwargs.pop('bbox_inches')
 
         # Need to disconnect the first draw callback, since we'll be doing
         # draws. Otherwise, we'll end up starting the animation.
@@ -850,16 +886,11 @@ class Animation(object):
             # Convert interval in ms to frames per second
             fps = 1000. / self._interval
 
-        # If the writer is None, use the rc param to find the name of the one
-        # to use
-        if writer is None:
-            writer = rcParams['animation.writer']
-
         # Re-use the savefig DPI for ours if none is given
         if dpi is None:
             dpi = rcParams['savefig.dpi']
-            if dpi == 'figure':
-                dpi = self._fig.dpi
+        if dpi == 'figure':
+            dpi = self._fig.dpi
 
         if codec is None:
             codec = rcParams['animation.codec']
@@ -881,7 +912,6 @@ class Animation(object):
                                          extra_args=extra_args,
                                          metadata=metadata)
             else:
-                import warnings
                 warnings.warn("MovieWriter %s unavailable" % writer)
 
                 try:
@@ -890,27 +920,41 @@ class Animation(object):
                                                         metadata=metadata)
                 except IndexError:
                     raise ValueError("Cannot save animation: no writers are "
-                                     "available. Please install mencoder or "
+                                     "available. Please install "
                                      "ffmpeg to save animations.")
 
         verbose.report('Animation.save using %s' % type(writer),
                        level='helpful')
+
+        if 'bbox_inches' in savefig_kwargs:
+            warnings.warn("Warning: discarding the 'bbox_inches' argument in "
+                          "'savefig_kwargs' as it may cause frame size "
+                          "to vary, which is inappropriate for animation.")
+            savefig_kwargs.pop('bbox_inches')
+
         # Create a new sequence of frames for saved data. This is different
         # from new_frame_seq() to give the ability to save 'live' generated
         # frame information to be saved later.
         # TODO: Right now, after closing the figure, saving a movie won't work
         # since GUI widgets are gone. Either need to remove extra code to
-        # allow for this non-existant use case or find a way to make it work.
-        with writer.saving(self._fig, filename, dpi):
-            for anim in all_anim:
-                # Clear the initial frame
-                anim._init_draw()
-            for data in zip(*[a.new_saved_frame_seq()
-                              for a in all_anim]):
-                for anim, d in zip(all_anim, data):
-                    # TODO: Need to see if turning off blit is really necessary
-                    anim._draw_next_frame(d, blit=False)
-                writer.grab_frame(**savefig_kwargs)
+        # allow for this non-existent use case or find a way to make it work.
+        with rc_context():
+            if (rcParams['savefig.bbox'] == 'tight'):
+                verbose.report("Disabling savefig.bbox = 'tight', as it "
+                               "may cause frame size to vary, which "
+                               "is inappropriate for animation.",
+                               level='helpful')
+                rcParams['savefig.bbox'] = None
+            with writer.saving(self._fig, filename, dpi):
+                for anim in all_anim:
+                    # Clear the initial frame
+                    anim._init_draw()
+                for data in zip(*[a.new_saved_frame_seq()
+                                  for a in all_anim]):
+                    for anim, d in zip(all_anim, data):
+                        # TODO: See if turning off blit is really necessary
+                        anim._draw_next_frame(d, blit=False)
+                    writer.grab_frame(**savefig_kwargs)
 
         # Reconnect signal for first draw if necessary
         if reconnect_first_draw:
@@ -998,7 +1042,8 @@ class Animation(object):
         # cache and restore.
         axes = set(a.axes for a in artists)
         for a in axes:
-            a.figure.canvas.restore_region(bg_cache[a])
+            if a in bg_cache:
+                a.figure.canvas.restore_region(bg_cache[a])
 
     def _setup_blit(self):
         # Setting up the blit requires: a cache of the background for the
@@ -1024,7 +1069,7 @@ class Animation(object):
     def _end_redraw(self, evt):
         # Now that the redraw has happened, do the post draw flushing and
         # blit handling. Then re-enable all of the original events.
-        self._post_draw(None, self._blit)
+        self._post_draw(None, False)
         self.event_source.start()
         self._fig.canvas.mpl_disconnect(self._resize_id)
         self._resize_id = self._fig.canvas.mpl_connect('resize_event',
@@ -1037,7 +1082,7 @@ class Animation(object):
         directly into the HTML5 video tag. This respects the rc parameters
         for the writer as well as the bitrate. This also makes use of the
         ``interval`` to control the speed, and uses the ``repeat``
-        paramter to decide whether to loop.
+        parameter to decide whether to loop.
         '''
         VIDEO_TAG = r'''<video {size} {options}>
   <source type="video/mp4" src="data:video/mp4;base64,{video}">
@@ -1155,7 +1200,7 @@ class ArtistAnimation(TimedAnimation):
     Before calling this function, all plotting should have taken place
     and the relevant artists saved.
 
-    frame_info is a list, with each list entry a collection of artists that
+    *artists* is a list, with each list entry a collection of artists that
     represent what needs to be enabled on each frame. These will be disabled
     for other frames.
     '''
@@ -1175,11 +1220,11 @@ class ArtistAnimation(TimedAnimation):
             for artist in f:
                 artist.set_visible(False)
                 artist.set_animated(self._blit)
-                # Assemble a list of unique axes that need flushing
-                if artist.axes.figure not in figs:
-                    figs.add(artist.axes.figure)
+                # Assemble a list of unique figures that need flushing
+                if artist.get_figure() not in figs:
+                    figs.add(artist.get_figure())
 
-        # Flush the needed axes
+        # Flush the needed figures
         for fig in figs:
             fig.canvas.draw_idle()
 
@@ -1216,8 +1261,8 @@ class FuncAnimation(TimedAnimation):
     results of drawing from the first item in the frames sequence will be
     used. This function will be called once before the first frame.
 
-    If blit=True, *func* and *init_func* should return an iterable of
-    drawables to clear.
+    If blit=True, *func* and *init_func* must return an iterable of
+    artists to be re-drawn.
 
     *kwargs* include *repeat*, *repeat_delay*, and *interval*:
     *interval* draws a new frame every *interval* milliseconds.
@@ -1298,6 +1343,9 @@ class FuncAnimation(TimedAnimation):
         else:
             self._drawn_artists = self._init_func()
             if self._blit:
+                if self._drawn_artists is None:
+                    raise RuntimeError('The init_func must return a '
+                                       'sequence of Artist objects.')
                 for a in self._drawn_artists:
                     a.set_animated(self._blit)
         self._save_seq = []
@@ -1314,5 +1362,8 @@ class FuncAnimation(TimedAnimation):
         # func needs to return a sequence of any artists that were modified.
         self._drawn_artists = self._func(framedata, *self._args)
         if self._blit:
+            if self._drawn_artists is None:
+                    raise RuntimeError('The animation function must return a '
+                                       'sequence of Artist objects.')
             for a in self._drawn_artists:
                 a.set_animated(self._blit)

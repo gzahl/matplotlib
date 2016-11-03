@@ -50,12 +50,12 @@ completely, leaving a purely object-oriented approach.
 
 Parts of a Figure
 =================
-.. image:: fig_map.png
+.. image:: anatomy.png
 
 :class:`~matplotlib.figure.Figure`
 ----------------------------------
 
-The **whole** figure (marked as the outer red box).  The figure keeps
+The **whole** figure.  The figure keeps
 track of all the child :class:`~matplotlib.axes.Axes`, a smattering of
 'special' artists (titles, figure legends, etc), and the **canvas**.
 (Don't worry too much about the canvas, it is crucial as it is the
@@ -302,7 +302,7 @@ pygtk, wxpython, tkinter, qt4, or macosx; also referred to as
 "interactive backends") and hardcopy backends to make image files
 (PNG, SVG, PDF, PS; also referred to as "non-interactive backends").
 
-There are a four ways to configure your backend. If they conflict each other,
+There are four ways to configure your backend. If they conflict each other,
 the method mentioned last in the following list will be used, e.g. calling
 :func:`~matplotlib.use()` will override the setting in your ``matplotlibrc``.
 
@@ -370,10 +370,10 @@ renderer for user interfaces is ``Agg`` which uses the `Anti-Grain
 Geometry`_ C++ library to make a raster (pixel) image of the figure.
 All of the user interfaces except ``macosx`` can be used with
 agg rendering, e.g.,
-``WXAgg``, ``GTKAgg``, ``QT4Agg``, ``TkAgg``.  In
+``WXAgg``, ``GTKAgg``, ``QT4Agg``, ``QT5Agg``, ``TkAgg``.  In
 addition, some of the user interfaces support other rendering engines.
 For example, with GTK, you can also select GDK rendering (backend
-``GTK``) or Cairo rendering (backend ``GTKCairo``).
+``GTK`` deprecated in 2.0) or Cairo rendering (backend ``GTKCairo``).
 
 For the rendering engines, one can also distinguish between `vector
 <http://en.wikipedia.org/wiki/Vector_graphics>`_ or `raster
@@ -404,7 +404,7 @@ SVG             :term:`svg`    :term:`vector graphics` --
                 :term:`svg`
                 ...
 :term:`GDK`     :term:`png`    :term:`raster graphics` --
-                :term:`jpg`    the `Gimp Drawing Kit`_
+                :term:`jpg`    the `Gimp Drawing Kit`_ Deprecated in 2.0
                 :term:`tiff`
                 ...
 =============   ============   ================================================
@@ -421,8 +421,9 @@ GTKAgg         Agg rendering to a :term:`GTK` 2.x canvas (requires PyGTK_ and
                pycairo_ or cairocffi_; Python2 only)
 GTK3Agg        Agg rendering to a :term:`GTK` 3.x canvas (requires PyGObject_
                and pycairo_ or cairocffi_)
-GTK            GDK rendering to a :term:`GTK` 2.x canvas (not recommended)
-               (requires PyGTK_ and pycairo_ or cairocffi_; Python2 only)
+GTK            GDK rendering to a :term:`GTK` 2.x canvas (not recommended and d
+               eprecated in 2.0) (requires PyGTK_ and pycairo_ or cairocffi_;
+               Python2 only)
 GTKCairo       Cairo rendering to a :term:`GTK` 2.x canvas (requires PyGTK_
                and pycairo_ or cairocffi_; Python2 only)
 GTK3Cairo      Cairo rendering to a :term:`GTK` 3.x canvas (requires PyGObject_
@@ -430,7 +431,7 @@ GTK3Cairo      Cairo rendering to a :term:`GTK` 3.x canvas (requires PyGObject_
 WXAgg          Agg rendering to to a :term:`wxWidgets` canvas
                (requires wxPython_)
 WX             Native :term:`wxWidgets` drawing to a :term:`wxWidgets` Canvas
-               (not recommended) (requires wxPython_)
+               (not recommended and deprecated in 2.0) (requires wxPython_)
 TkAgg          Agg rendering to a :term:`Tk` canvas (requires TkInter_)
 Qt4Agg         Agg rendering to a :term:`Qt4` canvas (requires PyQt4_ or ``pyside``)
 Qt5Agg         Agg rendering in a :term:`Qt5` canvas (requires PyQt5_)
@@ -522,7 +523,9 @@ and turned off via :func:`matplotlib.pyplot.ioff`.
 
 .. note::
    Interactive mode works with suitable backends in ipython and in
-   the ordinary python shell, but it does *not* work in the IDLE IDE.
+   the ordinary python shell, but it does *not* work in the IDLE IDE. 
+   If the default backend does not support interactivity, an interactive 
+   backend can be explicitly activated using any of the methods discussed in `What is a backend?`_.
 
 
 Interactive example
@@ -545,9 +548,8 @@ can type additional commands such as::
 
 and you will see the plot being updated after each line.  This is
 because you are in interactive mode *and* you are using pyplot
-functions.  Now try an alternative method of modifying the
-plot.  Get a
-reference to the :class:`~matplotlib.axes.Axes` instance, and
+functions. Now try an alternative method of modifying the
+plot.  Get a reference to the :class:`~matplotlib.axes.Axes` instance, and
 call a method of that instance::
 
     ax = plt.gca()

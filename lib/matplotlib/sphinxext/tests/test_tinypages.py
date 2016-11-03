@@ -14,8 +14,8 @@ HERE = dirname(__file__)
 TINY_PAGES = pjoin(HERE, 'tinypages')
 
 
-def setup():
-    # Check we have the sphinx-build command
+def setup_module():
+    """Check we have the sphinx-build command"""
     try:
         ret = call(['sphinx-build', '--help'], stdout=PIPE, stderr=PIPE)
     except OSError:
@@ -33,7 +33,7 @@ def file_same(file1, file2):
 
 
 class TestTinyPages(object):
-    # Test build and output of tinypages project
+    """Test build and output of tinypages project"""
 
     @classmethod
     def setup_class(cls):
@@ -48,14 +48,12 @@ class TestTinyPages(object):
                    cls.html_dir]
             proc = Popen(cmd, stdout=PIPE, stderr=PIPE)
             out, err = proc.communicate()
+            if proc.returncode != 0:
+                raise RuntimeError('sphinx-build failed with stdout:\n'
+                                   '{0}\nstderr:\n{1}\n'.format(out, err))
         except Exception as e:
             shutil.rmtree(cls.page_build)
             raise e
-        if proc.returncode != 0:
-            shutil.rmtree(cls.page_build)
-            raise RuntimeError('sphinx-build failed with stdout:\n'
-                               '{0}\nstderr:\n{1}\n'.format(
-                                    out, err))
 
     @classmethod
     def teardown_class(cls):
@@ -80,11 +78,11 @@ class TestTinyPages(object):
         # Plot 13 shows close-figs in action
         assert_true(file_same(range_4, plot_file(13)))
         # Plot 14 has included source
-        with open(pjoin(self.html_dir, 'some_plots.html'), 'rt') as fobj:
+        with open(pjoin(self.html_dir, 'some_plots.html'), 'rb') as fobj:
             html_contents = fobj.read()
-        assert_true('# Only a comment' in html_contents)
+        assert_true(b'# Only a comment' in html_contents)
         # check plot defined in external file.
         assert_true(file_same(range_4, pjoin(self.html_dir, 'range4.png')))
         assert_true(file_same(range_6, pjoin(self.html_dir, 'range6.png')))
         # check if figure caption made it into html file
-        assert_true('This is the caption for plot 15.' in html_contents)
+        assert_true(b'This is the caption for plot 15.' in html_contents)

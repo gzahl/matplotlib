@@ -102,7 +102,7 @@ to MATLAB&reg;, a registered trademark of The MathWorks, Inc.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
+import six
 import sys
 import distutils.version
 from itertools import chain
@@ -119,15 +119,18 @@ import distutils.sysconfig
 import functools
 # cbook must import matplotlib only within function
 # definitions, so it is safe to import from it here.
-from matplotlib.cbook import is_string_like, mplDeprecation, dedent, get_label
+from matplotlib.cbook import (is_string_like,
+                              mplDeprecation,
+                              dedent, get_label,
+                              sanitize_sequence)
 from matplotlib.compat import subprocess
 from matplotlib.rcsetup import (defaultParams,
                                 validate_backend,
                                 cycler)
 
 import numpy
-from matplotlib.externals.six.moves.urllib.request import urlopen
-from matplotlib.externals.six.moves import reload_module as reload
+from six.moves.urllib.request import urlopen
+from six.moves import reload_module as reload
 
 # Get the version from the _version.py versioneer file. For a git checkout,
 # this is computed based on the number of commits since the last tag.
@@ -136,6 +139,21 @@ __version__ = str(get_versions()['version'])
 del get_versions
 
 __version__numpy__ = str('1.6')  # minimum required numpy version
+
+__bibtex__ = """@Article{Hunter:2007,
+  Author    = {Hunter, J. D.},
+  Title     = {Matplotlib: A 2D graphics environment},
+  Journal   = {Computing In Science \& Engineering},
+  Volume    = {9},
+  Number    = {3},
+  Pages     = {90--95},
+  abstract  = {Matplotlib is a 2D graphics package used for Python
+  for application development, interactive scripting, and
+  publication-quality image generation across user
+  interfaces and operating systems.},
+  publisher = {IEEE COMPUTER SOC},
+  year      = 2007
+}"""
 
 try:
     import dateutil
@@ -350,23 +368,27 @@ def checkdep_dvipng():
 
 
 def checkdep_ghostscript():
-    if sys.platform == 'win32':
-        # mgs is the name in miktex
-        gs_execs = ['gswin32c', 'gswin64c', 'mgs', 'gs']
-    else:
-        gs_execs = ['gs']
-    for gs_exec in gs_execs:
-        try:
-            s = subprocess.Popen(
-                [gs_exec, '--version'], stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE)
-            stdout, stderr = s.communicate()
-            if s.returncode == 0:
-                v = stdout[:-1].decode('ascii')
-                return gs_exec, v
-        except (IndexError, ValueError, OSError):
-            pass
-    return None, None
+    if checkdep_ghostscript.executable is None:
+        if sys.platform == 'win32':
+            # mgs is the name in miktex
+            gs_execs = ['gswin32c', 'gswin64c', 'mgs', 'gs']
+        else:
+            gs_execs = ['gs']
+        for gs_exec in gs_execs:
+            try:
+                s = subprocess.Popen(
+                    [gs_exec, '--version'], stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE)
+                stdout, stderr = s.communicate()
+                if s.returncode == 0:
+                    v = stdout[:-1].decode('ascii')
+                    checkdep_ghostscript.executable = gs_exec
+                    checkdep_ghostscript.version = v
+            except (IndexError, ValueError, OSError):
+                pass
+    return checkdep_ghostscript.executable, checkdep_ghostscript.version
+checkdep_ghostscript.executable = None
+checkdep_ghostscript.version = None
 
 
 def checkdep_tex():
@@ -398,18 +420,21 @@ def checkdep_pdftops():
 
 
 def checkdep_inkscape():
-    try:
-        s = subprocess.Popen(['inkscape', '-V'], stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
-        stdout, stderr = s.communicate()
-        lines = stdout.decode('ascii').split('\n')
-        for line in lines:
-            if 'Inkscape' in line:
-                v = line.split()[1]
-                break
-        return v
-    except (IndexError, ValueError, UnboundLocalError, OSError):
-        return None
+    if checkdep_inkscape.version is None:
+        try:
+            s = subprocess.Popen(['inkscape', '-V'], stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
+            stdout, stderr = s.communicate()
+            lines = stdout.decode('ascii').split('\n')
+            for line in lines:
+                if 'Inkscape' in line:
+                    v = line.split()[1]
+                    break
+            checkdep_inkscape.version = v
+        except (IndexError, ValueError, UnboundLocalError, OSError):
+            pass
+    return checkdep_inkscape.version
+checkdep_inkscape.version = None
 
 
 def checkdep_xmllint():
@@ -554,16 +579,14 @@ def _create_tmp_config_dir():
         # Some restricted platforms (such as Google App Engine) do not provide
         # gettempdir.
         return None
-
     try:
         username = getpass.getuser()
     except KeyError:
         username = str(os.getuid())
-    tempdir = os.path.join(tempdir, 'matplotlib-%s' % username)
+
+    tempdir = tempfile.mkdtemp(prefix='matplotlib-%s-' % username, dir=tempdir)
 
     os.environ['MPLCONFIGDIR'] = tempdir
-
-    mkdirs(tempdir)
 
     return tempdir
 
@@ -616,8 +639,10 @@ def _get_config_or_cache_dir(xdg_base):
     h = get_home()
     if h is not None:
         p = os.path.join(h, '.matplotlib')
-    if (sys.platform.startswith('linux') and xdg_base):
-        p = os.path.join(xdg_base, 'matplotlib')
+    if sys.platform.startswith('linux'):
+        p = None
+        if xdg_base is not None:
+            p = os.path.join(xdg_base, 'matplotlib')
 
     if p is not None:
         if os.path.exists(p):
@@ -642,9 +667,8 @@ def _get_configdir():
 
     1. If the MPLCONFIGDIR environment variable is supplied, choose that.
 
-    2a. On Linux, if `$HOME/.matplotlib` exists, choose that, but warn that
-        that is the old location.  Barring that, follow the XDG specification
-        and look first in `$XDG_CONFIG_HOME`, if defined, or `$HOME/.config`.
+    2a. On Linux, follow the XDG specification and look first in
+        `$XDG_CONFIG_HOME`, if defined, or `$HOME/.config`.
 
     2b. On other platforms, choose `$HOME/.matplotlib`.
 
@@ -771,9 +795,7 @@ def matplotlib_fname():
 
     - On Linux,
 
-          - `$HOME/.matplotlib/matplotlibrc`, if it exists
-
-          - or `$XDG_CONFIG_HOME/matplotlib/matplotlibrc` (if
+          - `$XDG_CONFIG_HOME/matplotlib/matplotlibrc` (if
             $XDG_CONFIG_HOME is defined)
 
           - or `$HOME/.config/matplotlib/matplotlibrc` (if
@@ -804,24 +826,9 @@ def matplotlib_fname():
                 return fname
 
     configdir = _get_configdir()
-    if configdir is not None:
+    if os.path.exists(configdir):
         fname = os.path.join(configdir, 'matplotlibrc')
         if os.path.exists(fname):
-            home = get_home()
-            if (sys.platform.startswith('linux') and
-                home is not None and
-                os.path.exists(os.path.join(
-                    home, '.matplotlib', 'matplotlibrc'))):
-                warnings.warn(
-                    "Found matplotlib configuration in ~/.matplotlib/. "
-                    "To conform with the XDG base directory standard, "
-                    "this configuration location has been deprecated "
-                    "on Linux, and the new location is now %s/matplotlib/. "
-                    "Please move your configuration there to ensure that "
-                    "matplotlib will continue to find it in the future." %
-                    _get_xdg_config_dir())
-                return os.path.join(
-                    home, '.matplotlib', 'matplotlibrc')
             return fname
 
     path = get_data_path()  # guaranteed to exist or raise
@@ -853,7 +860,7 @@ _deprecated_map = {
 _deprecated_ignore_map = {
     }
 
-_obsolete_set = set(['tk.pythoninspect', ])
+_obsolete_set = set(['tk.pythoninspect', 'legend.isaxes'])
 _all_deprecated = set(chain(_deprecated_ignore_map,
                             _deprecated_map, _obsolete_set))
 
@@ -872,6 +879,8 @@ class RcParams(dict):
                     if key not in _all_deprecated)
     msg_depr = "%s is deprecated and replaced with %s; please use the latter."
     msg_depr_ignore = "%s is deprecated and ignored. Use %s"
+    msg_obsolete = ("%s is obsolete. Please remove it from your matplotlibrc "
+                    "and/or style files.")
 
     # validate values on the way in
     def __init__(self, *args, **kwargs):
@@ -888,6 +897,9 @@ class RcParams(dict):
             elif key in _deprecated_ignore_map:
                 alt = _deprecated_ignore_map[key]
                 warnings.warn(self.msg_depr_ignore % (key, alt))
+                return
+            elif key in _obsolete_set:
+                warnings.warn(self.msg_obsolete % (key,))
                 return
             try:
                 cval = self.validate[key](val)
@@ -909,6 +921,10 @@ See rcParams.keys() for a list of valid parameters.' % (key,))
             alt = _deprecated_ignore_map[key]
             warnings.warn(self.msg_depr_ignore % (key, alt))
             key = alt
+
+        elif key in _obsolete_set:
+            warnings.warn(self.msg_obsolete % (key,))
+            return None
 
         val = dict.__getitem__(self, key)
         if inverse_alt is not None:
@@ -1285,7 +1301,15 @@ class rc_context(object):
             plt.plot(x, a)
 
     The 'rc' dictionary takes precedence over the settings loaded from
-    'fname'.  Passing a dictionary only is also valid.
+    'fname'.  Passing a dictionary only is also valid. For example a
+    common usage is::
+
+        with mpl.rc_context(rc={'interactive': False}):
+            fig, ax = plt.subplots()
+            ax.plot(range(3), range(3))
+            fig.savefig('A.png', format='png')
+            plt.close(fig)
+
     """
 
     def __init__(self, rc=None, fname=None):
@@ -1317,10 +1341,13 @@ def rc_file_defaults():
     """
     rcParams.update(rcParamsOrig)
 
-_use_error_msg = """ This call to matplotlib.use() has no effect
-because the backend has already been chosen;
-matplotlib.use() must be called *before* pylab, matplotlib.pyplot,
+_use_error_msg = """
+This call to matplotlib.use() has no effect because the backend has already
+been chosen; matplotlib.use() must be called *before* pylab, matplotlib.pyplot,
 or matplotlib.backends is imported for the first time.
+
+The backend was *originally* set to {backend!r} by the following code:
+{tb}
 """
 
 
@@ -1361,7 +1388,12 @@ def use(arg, warn=True, force=False):
     if 'matplotlib.backends' in sys.modules:
         # Warn only if called with a different name
         if (rcParams['backend'] != name) and warn:
-            warnings.warn(_use_error_msg)
+            import matplotlib.backends
+            warnings.warn(
+                _use_error_msg.format(
+                    backend=rcParams['backend'],
+                    tb=matplotlib.backends._backend_loading_tb),
+                stacklevel=2)
 
         # Unless we've been told to force it, just return
         if not force:
@@ -1430,15 +1462,24 @@ else:
     # variable MPLBACKEND
     try:
         use(os.environ['MPLBACKEND'])
-    except (KeyError, ValueError):
+    except KeyError:
         pass
+
+
+# Jupyter extension paths
+def _jupyter_nbextension_paths():
+    return [{
+        'section': 'notebook',
+        'src': 'backends/web_backend/js',
+        'dest': 'matplotlib',
+        'require': 'matplotlib/extension'
+    }]
+
 
 default_test_modules = [
     'matplotlib.tests.test_agg',
-    'matplotlib.tests.test_animation',
     'matplotlib.tests.test_arrow_patches',
     'matplotlib.tests.test_artist',
-    'matplotlib.tests.test_axes',
     'matplotlib.tests.test_backend_bases',
     'matplotlib.tests.test_backend_pdf',
     'matplotlib.tests.test_backend_pgf',
@@ -1448,7 +1489,6 @@ default_test_modules = [
     'matplotlib.tests.test_backend_svg',
     'matplotlib.tests.test_basic',
     'matplotlib.tests.test_bbox_tight',
-    'matplotlib.tests.test_cbook',
     'matplotlib.tests.test_coding_standards',
     'matplotlib.tests.test_collections',
     'matplotlib.tests.test_colorbar',
@@ -1457,7 +1497,6 @@ default_test_modules = [
     'matplotlib.tests.test_container',
     'matplotlib.tests.test_contour',
     'matplotlib.tests.test_dates',
-    'matplotlib.tests.test_delaunay',
     'matplotlib.tests.test_dviread',
     'matplotlib.tests.test_figure',
     'matplotlib.tests.test_font_manager',
@@ -1474,9 +1513,10 @@ default_test_modules = [
     'matplotlib.tests.test_pickle',
     'matplotlib.tests.test_png',
     'matplotlib.tests.test_quiver',
-    'matplotlib.tests.test_rcparams',
+    'matplotlib.tests.test_sankey',
     'matplotlib.tests.test_scale',
     'matplotlib.tests.test_simplification',
+    'matplotlib.tests.test_skew',
     'matplotlib.tests.test_spines',
     'matplotlib.tests.test_streamplot',
     'matplotlib.tests.test_style',
@@ -1484,15 +1524,16 @@ default_test_modules = [
     'matplotlib.tests.test_table',
     'matplotlib.tests.test_text',
     'matplotlib.tests.test_texmanager',
-    'matplotlib.tests.test_ticker',
     'matplotlib.tests.test_tightlayout',
     'matplotlib.tests.test_transforms',
     'matplotlib.tests.test_triangulation',
     'matplotlib.tests.test_type1font',
+    'matplotlib.tests.test_ttconv',
     'matplotlib.tests.test_units',
+    'matplotlib.tests.test_usetex',
     'matplotlib.tests.test_widgets',
     'matplotlib.tests.test_cycles',
-    'matplotlib.tests.test_labeled_data_unpacking',
+    'matplotlib.tests.test_preprocess_data',
     'matplotlib.sphinxext.tests.test_tinypages',
     'mpl_toolkits.tests.test_mplot3d',
     'mpl_toolkits.tests.test_axes_grid1',
@@ -1521,82 +1562,41 @@ def _init_tests():
         warnings.warn(
             "matplotlib is not built with the correct FreeType version to run "
             "tests.  Set local_freetype=True in setup.cfg and rebuild. "
-            "Expect many image comparison failures below.")
+            "Expect many image comparison failures below. "
+            "Expected freetype version {0}. "
+            "Found freetype version {1}. "
+            "Freetype build type is {2}local".format(
+                ft2font.__freetype_version__,
+                LOCAL_FREETYPE_VERSION,
+                "" if ft2font.__freetype_build_type__ == 'local' else "not "
+            )
+        )
 
-    try:
-        import nose
-        try:
-            from unittest import mock
-        except:
-            import mock
-    except ImportError:
-        print("matplotlib.test requires nose and mock to run.")
-        raise
-
-
-def _get_extra_test_plugins():
-    from .testing.noseclasses import KnownFailure
-    from nose.plugins import attrib
-
-    return [KnownFailure, attrib.Plugin]
+    from .testing.nose import check_deps
+    check_deps()
 
 
-def _get_nose_env():
-    env = {'NOSE_COVER_PACKAGE': 'matplotlib',
-           'NOSE_COVER_HTML': 1,
-           'NOSE_COVER_NO_PRINT': 1}
-    return env
-
-
-def test(verbosity=1, coverage=False):
+def test(verbosity=1, coverage=False, **kwargs):
     """run the matplotlib test suite"""
     _init_tests()
 
-    old_backend = rcParams['backend']
-    try:
-        use('agg')
-        import nose
-        import nose.plugins.builtin
-        from nose.plugins.manager import PluginManager
-        from nose.plugins import multiprocess
+    from .testing.nose import test as nose_test
+    return nose_test(verbosity, coverage, **kwargs)
 
-        # store the old values before overriding
-        plugins = _get_extra_test_plugins()
-        plugins.extend([plugin for plugin in nose.plugins.builtin.plugins])
-
-        manager = PluginManager(plugins=[x() for x in plugins])
-        config = nose.config.Config(verbosity=verbosity, plugins=manager)
-
-        # Nose doesn't automatically instantiate all of the plugins in the
-        # child processes, so we have to provide the multiprocess plugin with
-        # a list.
-        multiprocess._instantiate_plugins = plugins
-
-        env = _get_nose_env()
-        if coverage:
-            env['NOSE_WITH_COVERAGE'] = 1
-
-        success = nose.run(
-            defaultTest=default_test_modules,
-            config=config,
-            env=env,
-        )
-    finally:
-        if old_backend.lower() != 'agg':
-            use(old_backend)
-
-    return success
 
 test.__test__ = False  # nose: this function is not a test
 
 
 def _replacer(data, key):
+    """Either returns data[key] or passes data back. Also
+    converts input data to a sequence as needed.
+    """
     # if key isn't a string don't bother
     if not isinstance(key, six.string_types):
-        return key
+        return (key)
     # try to use __getitem__
     try:
-        return data[key]
+        return sanitize_sequence(data[key])
     # key does not exist, silently fall back to key
     except KeyError:
         return key
@@ -1604,18 +1604,16 @@ def _replacer(data, key):
 
 _DATA_DOC_APPENDIX = """
 
-Notes
------
+.. note::
+    In addition to the above described arguments, this function can take a
+    **data** keyword argument. If such a **data** argument is given, the
+    following arguments are replaced by **data[<arg>]**:
 
-In addition to the above described arguments, this function can take a
-**data** keyword argument. If such a **data** argument is given, the
-following arguments are replaced by **data[<arg>]**:
-
-{replaced}
+    {replaced}
 """
 
 
-def unpack_labeled_data(replace_names=None, replace_all_args=False,
+def _preprocess_data(replace_names=None, replace_all_args=False,
                         label_namer=None, positional_parameter_names=None):
     """
     A decorator to add a 'data' kwarg to any a function.  The signature
@@ -1649,6 +1647,8 @@ def unpack_labeled_data(replace_names=None, replace_all_args=False,
         NOTE: callables should only be used when the names and order of *args
         can only be determined at runtime. Please use list of names
         when the order and names of *args is clear before runtime!
+
+    .. note:: decorator also converts MappingView input data to list.
     """
     if replace_names is not None:
         replace_names = set(replace_names)
@@ -1789,7 +1789,10 @@ def unpack_labeled_data(replace_names=None, replace_all_args=False,
             label = None
 
             data = kwargs.pop('data', None)
-            if data is not None:
+
+            if data is None:  # data validation
+                args = tuple(sanitize_sequence(a) for a in args)
+            else:
                 if arg_names_at_runtime:
                     # update the information about replace names and
                     # label position

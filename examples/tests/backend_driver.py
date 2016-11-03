@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 from __future__ import print_function, division
 """
 This is used to drive many of the examples across the backends, for
@@ -45,7 +43,8 @@ dirs = dict(files=os.path.join('..', 'lines_bars_and_markers'),
             pylab=os.path.join('..', 'pylab_examples'),
             api=os.path.join('..', 'api'),
             units=os.path.join('..', 'units'),
-            mplot3d=os.path.join('..', 'mplot3d'))
+            mplot3d=os.path.join('..', 'mplot3d'),
+            colors=os.path.join('..', 'color'))
 
 
 # files in each dir
@@ -66,6 +65,7 @@ files['shapes'] = [
     ]
 
 files['colors'] = [
+    'color_cycle_default.py',
     'color_cycle_demo.py',
     ]
 
@@ -202,7 +202,6 @@ files['pylab'] = [
     'masked_demo.py',
     'mathtext_demo.py',
     'mathtext_examples.py',
-    'matplotlib_icon.py',
     'matshow.py',
     'mri_demo.py',
     'mri_with_eeg.py',

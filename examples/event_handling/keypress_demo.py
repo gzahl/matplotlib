@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 """
 Show how to connect to keypress events
 """
@@ -17,11 +15,15 @@ def press(event):
         xl.set_visible(not visible)
         fig.canvas.draw()
 
+# Fixing random state for reproducibility
+np.random.seed(19680801)
+
+
 fig, ax = plt.subplots()
 
 fig.canvas.mpl_connect('key_press_event', press)
 
 ax.plot(np.random.rand(12), np.random.rand(12), 'go')
 xl = ax.set_xlabel('easy come, easy go')
-
+ax.set_title('Press a key')
 plt.show()

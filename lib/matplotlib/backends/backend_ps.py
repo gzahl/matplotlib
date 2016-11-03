@@ -5,17 +5,14 @@ A PostScript backend, which can produce both PostScript .ps and .eps
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
-from matplotlib.externals.six.moves import StringIO
+import six
+from six.moves import StringIO
 
 import glob, math, os, shutil, sys, time
 def _fn_name(): return sys._getframe(1).f_code.co_name
 import io
 
-try:
-    from hashlib import md5
-except ImportError:
-    from md5 import md5 #Deprecated in 2.5
+from hashlib import md5
 
 from tempfile import mkstemp
 from matplotlib import verbose, __version__, rcParams, checkdep_ghostscript
@@ -44,10 +41,6 @@ from matplotlib.backends.backend_mixed import MixedModeRenderer
 import numpy as np
 import binascii
 import re
-try:
-    set
-except NameError:
-    from sets import Set as set
 
 if sys.platform.startswith('win'): cmd_split = '&'
 else: cmd_split = ';'
@@ -165,15 +158,16 @@ def _num_to_str(val):
 def _nums_to_str(*args):
     return ' '.join(map(_num_to_str,args))
 
+
 def quote_ps_string(s):
     "Quote dangerous characters of S for use in a PostScript string constant."
-    s=s.replace("\\", "\\\\")
-    s=s.replace("(", "\\(")
-    s=s.replace(")", "\\)")
-    s=s.replace("'", "\\251")
-    s=s.replace("`", "\\301")
-    s=re.sub(r"[^ -~\n]", lambda x: r"\%03o"%ord(x.group()), s)
-    return s
+    s = s.replace(b"\\", b"\\\\")
+    s = s.replace(b"(", b"\\(")
+    s = s.replace(b")", b"\\)")
+    s = s.replace(b"'", b"\\251")
+    s = s.replace(b"`", b"\\301")
+    s = re.sub(br"[^ -~\n]", lambda x: br"\%03o" % ord(x.group()), s)
+    return s.decode('ascii')
 
 
 def seq_allequal(seq1, seq2):
@@ -303,6 +297,7 @@ class RendererPS(RendererBase):
         if hatch in self._hatches:
             return self._hatches[hatch]
         name = 'H%d' % len(self._hatches)
+        linewidth = rcParams['hatch.linewidth']
         self._pswriter.write("""\
   << /PatternType 1
      /PaintType 2
@@ -313,7 +308,7 @@ class RendererPS(RendererBase):
 
      /PaintProc {
         pop
-        0 setlinewidth
+        %(linewidth)f setlinewidth
 """ % locals())
         self._pswriter.write(
             self._convert_path(Path.hatch(hatch), Affine2D().scale(72.0),

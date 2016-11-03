@@ -1,7 +1,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
+import six
 
 import math
 
@@ -194,7 +194,6 @@ class GeoAxes(Axes):
         self.xaxis.set_major_locator(
             FixedLocator(
                 np.linspace(-np.pi, np.pi, number, True)[1:-1]))
-        self._logitude_degrees = degrees
         self.xaxis.set_major_formatter(self.ThetaFormatter(degrees))
 
     def set_latitude_grid(self, degrees):
@@ -205,7 +204,6 @@ class GeoAxes(Axes):
         self.yaxis.set_major_locator(
             FixedLocator(
                 np.linspace(-np.pi / 2.0, np.pi / 2.0, number, True)[1:-1]))
-        self._latitude_degrees = degrees
         self.yaxis.set_major_formatter(self.ThetaFormatter(degrees))
 
     def set_longitude_grid_ends(self, degrees):
@@ -442,7 +440,7 @@ class MollweideAxes(GeoAxes):
             clat = np.pi/2 - np.abs(latitude)
             ihigh = clat < 0.087 # within 5 degrees of the poles
             ilow = ~ihigh
-            aux = np.empty(latitude.shape, dtype=np.float)
+            aux = np.empty(latitude.shape, dtype=float)
 
             if ilow.any():  # Newton-Raphson iteration
                 pi_sin_l = np.pi * np.sin(latitude[ilow])
@@ -458,7 +456,7 @@ class MollweideAxes(GeoAxes):
                 d = 0.5 * (3 * np.pi * e**2) ** (1.0/3)
                 aux[ihigh] = (np.pi/2 - d) * np.sign(latitude[ihigh])
 
-            xy = np.empty(ll.shape, dtype=np.float)
+            xy = np.empty(ll.shape, dtype=float)
             xy[:,0] = (2.0 * np.sqrt(2.0) / np.pi) * longitude * np.cos(aux)
             xy[:,1] = np.sqrt(2.0) * np.sin(aux)
 

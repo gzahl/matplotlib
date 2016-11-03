@@ -133,8 +133,8 @@ The plot directive has the following configuration options:
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
-from matplotlib.externals.six.moves import xrange
+import six
+from six.moves import xrange
 
 import sys, os, shutil, io, re, textwrap
 from os.path import relpath
@@ -398,7 +398,12 @@ TEMPLATE = """
 
    {% for img in images %}
    {% if 'pdf' in img.formats -%}
-   .. image:: {{ build_dir }}/{{ img.basename }}.pdf
+   .. figure:: {{ build_dir }}/{{ img.basename }}.pdf
+      {% for option in options -%}
+      {{ option }}
+      {% endfor %}
+
+      {{ caption }}
    {% endif -%}
    {% endfor %}
 
@@ -701,7 +706,7 @@ def run(arguments, content, options, state_machine, state, lineno):
         output_base = os.path.basename(source_file_name)
     else:
         source_file_name = rst_file
-        code = textwrap.dedent("\n".join(map(str, content)))
+        code = textwrap.dedent("\n".join(map(six.text_type, content)))
         counter = document.attributes.get('_plot_counter', 0) + 1
         document.attributes['_plot_counter'] = counter
         base, ext = os.path.splitext(os.path.basename(source_file_name))

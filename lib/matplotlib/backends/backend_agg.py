@@ -22,7 +22,7 @@ TODO:
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from matplotlib.externals import six
+import six
 
 import threading
 import numpy as np
@@ -480,16 +480,44 @@ class FigureCanvasAgg(FigureCanvasBase):
         return self.renderer
 
     def tostring_rgb(self):
+        '''Get the image as an RGB byte string
+
+        `draw` must be called at least once before this function will work and
+        to update the renderer for any subsequent changes to the Figure.
+
+        Returns
+        -------
+        bytes
+        '''
         if __debug__: verbose.report('FigureCanvasAgg.tostring_rgb',
                                      'debug-annoying')
         return self.renderer.tostring_rgb()
 
     def tostring_argb(self):
+        '''Get the image as an ARGB byte string
+
+        `draw` must be called at least once before this function will work and
+        to update the renderer for any subsequent changes to the Figure.
+
+        Returns
+        -------
+        bytes
+
+        '''
         if __debug__: verbose.report('FigureCanvasAgg.tostring_argb',
                                      'debug-annoying')
         return self.renderer.tostring_argb()
 
     def buffer_rgba(self):
+        '''Get the image as an RGBA byte string
+
+        `draw` must be called at least once before this function will work and
+        to update the renderer for any subsequent changes to the Figure.
+
+        Returns
+        -------
+        bytes
+        '''
         if __debug__: verbose.report('FigureCanvasAgg.buffer_rgba',
                                      'debug-annoying')
         return self.renderer.buffer_rgba()
@@ -509,8 +537,8 @@ class FigureCanvasAgg(FigureCanvasBase):
             fileobj.write(renderer._renderer.buffer_rgba())
         finally:
             if close:
-                filename_or_obj.close()
-        renderer.dpi = original_dpi
+                fileobj.close()
+            renderer.dpi = original_dpi
     print_rgba = print_raw
 
     def print_png(self, filename_or_obj, *args, **kwargs):
@@ -529,16 +557,18 @@ class FigureCanvasAgg(FigureCanvasBase):
         finally:
             if close:
                 filename_or_obj.close()
-        renderer.dpi = original_dpi
+            renderer.dpi = original_dpi
 
     def print_to_buffer(self):
         FigureCanvasAgg.draw(self)
         renderer = self.get_renderer()
         original_dpi = renderer.dpi
         renderer.dpi = self.figure.dpi
-        result = (renderer._renderer.buffer_rgba(),
-                  (int(renderer.width), int(renderer.height)))
-        renderer.dpi = original_dpi
+        try:
+            result = (renderer._renderer.buffer_rgba(),
+                      (int(renderer.width), int(renderer.height)))
+        finally:
+            renderer.dpi = original_dpi
         return result
 
     if _has_pil:
@@ -566,9 +596,8 @@ class FigureCanvasAgg(FigureCanvasBase):
             # The image is "pasted" onto a white background image to safely
             # handle any transparency
             image = Image.frombuffer('RGBA', size, buf, 'raw', 'RGBA', 0, 1)
-            color = mcolors.colorConverter.to_rgb(
-                rcParams.get('savefig.facecolor', 'white'))
-            color = tuple([int(x * 255.0) for x in color])
+            rgba = mcolors.to_rgba(rcParams.get('savefig.facecolor', 'white'))
+            color = tuple([int(x * 255.0) for x in rgba[:3]])
             background = Image.new('RGB', size, color)
             background.paste(image, image)
             options = restrict_dict(kwargs, ['quality', 'optimize',

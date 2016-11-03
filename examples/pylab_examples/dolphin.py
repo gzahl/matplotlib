@@ -5,6 +5,9 @@ from matplotlib.path import Path
 from matplotlib.transforms import Affine2D
 import numpy as np
 
+# Fixing random state for reproducibility
+np.random.seed(19680801)
+
 
 r = np.random.rand(50)
 t = np.random.rand(50) * np.pi * 2.0
@@ -74,7 +77,7 @@ while i < len(parts):
     vertices.extend([[float(x) for x in y.split(',')] for y in
                      parts[i + 1:i + npoints + 1]])
     i += npoints + 1
-vertices = np.array(vertices, np.float)
+vertices = np.array(vertices, float)
 vertices[:, 1] -= 160
 
 dolphin_path = Path(vertices, codes)

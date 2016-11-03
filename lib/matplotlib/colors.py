@@ -15,21 +15,29 @@ colormap instances, but is also useful for making custom colormaps, and
 :class:`ListedColormap`, which is used for generating a custom colormap from a
 list of color specifications.
 
-The module also provides a single instance, *colorConverter*, of the
-:class:`ColorConverter` class providing methods for converting single color
-specifications or sequences of them to *RGB* or *RGBA*.
+The module also provides functions for checking whether an object can be
+interpreted as a color (:func:`is_color_like`), for converting such an object
+to an RGBA tuple (:func:`to_rgba`) or to an HTML-like hex string in the
+`#rrggbb` format (:func:`to_hex`), and a sequence of colors to an `(n, 4)`
+RGBA array (:func:`to_rgba_array`).  Caching is used for efficiency.
 
 Commands which take color arguments can use several formats to specify
 the colors.  For the basic built-in colors, you can use a single letter
 
-    - b: blue
-    - g: green
-    - r: red
-    - c: cyan
-    - m: magenta
-    - y: yellow
-    - k: black
-    - w: white
+    - `b`: blue
+    - `g`: green
+    - `r`: red
+    - `c`: cyan
+    - `m`: magenta
+    - `y`: yellow
+    - `k`: black
+    - `w`: white
+
+To use the colors that are part of the active color cycle in the current style,
+use `C` followed by a digit.  For example:
+
+    - `C0`: The first color in the cycle
+    - `C1`: The second color in the cycle
 
 Gray shades can be given as a string encoding a float in the 0-1 range, e.g.::
 
@@ -38,206 +46,225 @@ Gray shades can be given as a string encoding a float in the 0-1 range, e.g.::
 For a greater range of colors, you have two options.  You can specify the
 color using an html hex string, as in::
 
-      color = '#eeefff'
+    color = '#eeefff'
 
-or you can pass an *R* , *G* , *B* tuple, where each of *R* , *G* , *B* are in
-the range [0,1].
+(possibly specifying an alpha value as well), or you can pass an `(r, g, b)`
+or `(r, g, b, a)` tuple, where each of `r`, `g`, `b` and `a` are in the range
+[0,1].
 
 Finally, legal html names for colors, like 'red', 'burlywood' and 'chartreuse'
 are supported.
 """
+
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
-
-from matplotlib.externals import six
-from matplotlib.externals.six.moves import zip
-
-import warnings
 import re
+import six
+from six.moves import zip
+import warnings
+
 import numpy as np
-from numpy import ma
 import matplotlib.cbook as cbook
-
-cnames = {
-    'aliceblue':            '#F0F8FF',
-    'antiquewhite':         '#FAEBD7',
-    'aqua':                 '#00FFFF',
-    'aquamarine':           '#7FFFD4',
-    'azure':                '#F0FFFF',
-    'beige':                '#F5F5DC',
-    'bisque':               '#FFE4C4',
-    'black':                '#000000',
-    'blanchedalmond':       '#FFEBCD',
-    'blue':                 '#0000FF',
-    'blueviolet':           '#8A2BE2',
-    'brown':                '#A52A2A',
-    'burlywood':            '#DEB887',
-    'cadetblue':            '#5F9EA0',
-    'chartreuse':           '#7FFF00',
-    'chocolate':            '#D2691E',
-    'coral':                '#FF7F50',
-    'cornflowerblue':       '#6495ED',
-    'cornsilk':             '#FFF8DC',
-    'crimson':              '#DC143C',
-    'cyan':                 '#00FFFF',
-    'darkblue':             '#00008B',
-    'darkcyan':             '#008B8B',
-    'darkgoldenrod':        '#B8860B',
-    'darkgray':             '#A9A9A9',
-    'darkgreen':            '#006400',
-    'darkkhaki':            '#BDB76B',
-    'darkmagenta':          '#8B008B',
-    'darkolivegreen':       '#556B2F',
-    'darkorange':           '#FF8C00',
-    'darkorchid':           '#9932CC',
-    'darkred':              '#8B0000',
-    'darksage':             '#598556',
-    'darksalmon':           '#E9967A',
-    'darkseagreen':         '#8FBC8F',
-    'darkslateblue':        '#483D8B',
-    'darkslategray':        '#2F4F4F',
-    'darkturquoise':        '#00CED1',
-    'darkviolet':           '#9400D3',
-    'deeppink':             '#FF1493',
-    'deepskyblue':          '#00BFFF',
-    'dimgray':              '#696969',
-    'dodgerblue':           '#1E90FF',
-    'firebrick':            '#B22222',
-    'floralwhite':          '#FFFAF0',
-    'forestgreen':          '#228B22',
-    'fuchsia':              '#FF00FF',
-    'gainsboro':            '#DCDCDC',
-    'ghostwhite':           '#F8F8FF',
-    'gold':                 '#FFD700',
-    'goldenrod':            '#DAA520',
-    'gray':                 '#808080',
-    'green':                '#008000',
-    'greenyellow':          '#ADFF2F',
-    'honeydew':             '#F0FFF0',
-    'hotpink':              '#FF69B4',
-    'indianred':            '#CD5C5C',
-    'indigo':               '#4B0082',
-    'ivory':                '#FFFFF0',
-    'khaki':                '#F0E68C',
-    'lavender':             '#E6E6FA',
-    'lavenderblush':        '#FFF0F5',
-    'lawngreen':            '#7CFC00',
-    'lemonchiffon':         '#FFFACD',
-    'lightblue':            '#ADD8E6',
-    'lightcoral':           '#F08080',
-    'lightcyan':            '#E0FFFF',
-    'lightgoldenrodyellow': '#FAFAD2',
-    'lightgreen':           '#90EE90',
-    'lightgray':            '#D3D3D3',
-    'lightpink':            '#FFB6C1',
-    'lightsage':            '#BCECAC',
-    'lightsalmon':          '#FFA07A',
-    'lightseagreen':        '#20B2AA',
-    'lightskyblue':         '#87CEFA',
-    'lightslategray':       '#778899',
-    'lightsteelblue':       '#B0C4DE',
-    'lightyellow':          '#FFFFE0',
-    'lime':                 '#00FF00',
-    'limegreen':            '#32CD32',
-    'linen':                '#FAF0E6',
-    'magenta':              '#FF00FF',
-    'maroon':               '#800000',
-    'mediumaquamarine':     '#66CDAA',
-    'mediumblue':           '#0000CD',
-    'mediumorchid':         '#BA55D3',
-    'mediumpurple':         '#9370DB',
-    'mediumseagreen':       '#3CB371',
-    'mediumslateblue':      '#7B68EE',
-    'mediumspringgreen':    '#00FA9A',
-    'mediumturquoise':      '#48D1CC',
-    'mediumvioletred':      '#C71585',
-    'midnightblue':         '#191970',
-    'mintcream':            '#F5FFFA',
-    'mistyrose':            '#FFE4E1',
-    'moccasin':             '#FFE4B5',
-    'navajowhite':          '#FFDEAD',
-    'navy':                 '#000080',
-    'oldlace':              '#FDF5E6',
-    'olive':                '#808000',
-    'olivedrab':            '#6B8E23',
-    'orange':               '#FFA500',
-    'orangered':            '#FF4500',
-    'orchid':               '#DA70D6',
-    'palegoldenrod':        '#EEE8AA',
-    'palegreen':            '#98FB98',
-    'paleturquoise':        '#AFEEEE',
-    'palevioletred':        '#DB7093',
-    'papayawhip':           '#FFEFD5',
-    'peachpuff':            '#FFDAB9',
-    'peru':                 '#CD853F',
-    'pink':                 '#FFC0CB',
-    'plum':                 '#DDA0DD',
-    'powderblue':           '#B0E0E6',
-    'purple':               '#800080',
-    'red':                  '#FF0000',
-    'rosybrown':            '#BC8F8F',
-    'royalblue':            '#4169E1',
-    'saddlebrown':          '#8B4513',
-    'salmon':               '#FA8072',
-    'sage':                 '#87AE73',
-    'sandybrown':           '#FAA460',
-    'seagreen':             '#2E8B57',
-    'seashell':             '#FFF5EE',
-    'sienna':               '#A0522D',
-    'silver':               '#C0C0C0',
-    'skyblue':              '#87CEEB',
-    'slateblue':            '#6A5ACD',
-    'slategray':            '#708090',
-    'snow':                 '#FFFAFA',
-    'springgreen':          '#00FF7F',
-    'steelblue':            '#4682B4',
-    'tan':                  '#D2B48C',
-    'teal':                 '#008080',
-    'thistle':              '#D8BFD8',
-    'tomato':               '#FF6347',
-    'turquoise':            '#40E0D0',
-    'violet':               '#EE82EE',
-    'wheat':                '#F5DEB3',
-    'white':                '#FFFFFF',
-    'whitesmoke':           '#F5F5F5',
-    'yellow':               '#FFFF00',
-    'yellowgreen':          '#9ACD32'}
+from ._color_data import BASE_COLORS, CSS4_COLORS, XKCD_COLORS
 
 
-# add british equivs
-for k, v in list(six.iteritems(cnames)):
-    if k.find('gray') >= 0:
-        k = k.replace('gray', 'grey')
-        cnames[k] = v
+class _ColorMapping(dict):
+    def __init__(self, mapping):
+        super(_ColorMapping, self).__init__(mapping)
+        self.cache = {}
+
+    def __setitem__(self, key, value):
+        super(_ColorMapping, self).__setitem__(key, value)
+        self.cache.clear()
+
+    def __delitem__(self, key, value):
+        super(_ColorMapping, self).__delitem__(key, value)
+        self.cache.clear()
+
+
+_colors_full_map = {}
+# Set by reverse priority order.
+_colors_full_map.update(XKCD_COLORS)
+_colors_full_map.update(CSS4_COLORS)
+_colors_full_map.update(BASE_COLORS)
+_colors_full_map = _ColorMapping(_colors_full_map)
+
+
+def get_named_colors_mapping():
+    """Return the global mapping of names to named colors.
+    """
+    return _colors_full_map
+
+
+def _is_nth_color(c):
+    """Return whether `c` can be interpreted as an item in the color cycle.
+    """
+    return isinstance(c, six.string_types) and re.match(r"\AC[0-9]\Z", c)
 
 
 def is_color_like(c):
-    'Return *True* if *c* can be converted to *RGB*'
-    try:
-        colorConverter.to_rgb(c)
+    """Return whether `c` can be interpreted as an RGB(A) color.
+    """
+    # Special-case nth color syntax because it cannot be parsed during
+    # setup.
+    if _is_nth_color(c):
         return True
+    try:
+        to_rgba(c)
     except ValueError:
         return False
+    else:
+        return True
 
 
-def rgb2hex(rgb):
-    'Given an rgb or rgba sequence of 0-1 floats, return the hex string'
-    a = '#%02x%02x%02x' % tuple([int(np.round(val * 255)) for val in rgb[:3]])
-    return a
+def to_rgba(c, alpha=None):
+    """Convert `c` to an RGBA color.
 
+    If `alpha` is not `None`, it forces the alpha value.
+    """
+    # Special-case nth color syntax because it should not be cached.
+    if _is_nth_color(c):
+        from matplotlib import rcParams
+        prop_cycler = rcParams['axes.prop_cycle']
+        colors = prop_cycler.by_key().get('color', ['k'])
+        c = colors[int(c[1]) % len(colors)]
+    try:
+        rgba = _colors_full_map.cache[c, alpha]
+    except (KeyError, TypeError):  # Not in cache, or unhashable.
+        rgba = _to_rgba_no_colorcycle(c, alpha)
+        try:
+            _colors_full_map.cache[c, alpha] = rgba
+        except TypeError:
+            pass
+    return rgba
+
+
+def _to_rgba_no_colorcycle(c, alpha=None):
+    """Convert `c` to an RGBA color, with no support for color-cycle syntax.
+
+    If `alpha` is not `None`, it forces the alpha value.
+    """
+    orig_c = c
+    if isinstance(c, six.string_types):
+        if c.lower() == "none":
+            return (0., 0., 0., 0.)
+        # Named color.
+        try:
+            # This may turn c into a non-string, so we check again below.
+            c = _colors_full_map[c.lower()]
+        except KeyError:
+            pass
+    if isinstance(c, six.string_types):
+        # hex color with no alpha.
+        match = re.match(r"\A#[a-fA-F0-9]{6}\Z", c)
+        if match:
+            return (tuple(int(n, 16) / 255
+                          for n in [c[1:3], c[3:5], c[5:7]])
+                    + (alpha if alpha is not None else 1.,))
+        # hex color with alpha.
+        match = re.match(r"\A#[a-fA-F0-9]{8}\Z", c)
+        if match:
+            color = [int(n, 16) / 255
+                     for n in [c[1:3], c[3:5], c[5:7], c[7:9]]]
+            if alpha is not None:
+                color[-1] = alpha
+            return tuple(color)
+        # string gray.
+        try:
+            return (float(c),) * 3 + (alpha if alpha is not None else 1.,)
+        except ValueError:
+            pass
+        raise ValueError("Invalid RGBA argument: {!r}".format(orig_c))
+    # tuple color.
+    # Python 2.7 / numpy 1.6 apparently require this to return builtin floats,
+    # not numpy floats.
+    try:
+        c = tuple(map(float, c))
+    except TypeError:
+        raise ValueError("Invalid RGBA argument: {!r}".format(orig_c))
+    if len(c) not in [3, 4]:
+        raise ValueError("RGBA sequence should have length 3 or 4")
+    if len(c) == 3 and alpha is None:
+        alpha = 1
+    if alpha is not None:
+        c = c[:3] + (alpha,)
+    if any(elem < 0 or elem > 1 for elem in c):
+        raise ValueError("RGBA values should be within 0-1 range")
+    return c
+
+
+def to_rgba_array(c, alpha=None):
+    """Convert `c` to a (n, 4) array of RGBA colors.
+
+    If `alpha` is not `None`, it forces the alpha value.  If `c` is "none"
+    (case-insensitive) or an empty list, an empty array is returned.
+    """
+    # Single value?
+    if isinstance(c, six.string_types) and c.lower() == "none":
+        return np.zeros((0, 4), float)
+    try:
+        return np.array([to_rgba(c, alpha)], float)
+    except (ValueError, TypeError):
+        pass
+    # Special-case inputs that are already arrays, for performance.  (If the
+    # array has the wrong kind or shape, raise the error during one-at-a-time
+    # conversion.)
+    if (isinstance(c, np.ndarray) and c.dtype.kind in "if"
+            and c.ndim == 2 and c.shape[1] in [3, 4]):
+        if c.shape[1] == 3:
+            result = np.column_stack([c, np.zeros(len(c))])
+            result[:, -1] = alpha if alpha is not None else 1.
+        elif c.shape[1] == 4:
+            result = c.copy()
+            if alpha is not None:
+                result[:, -1] = alpha
+        if np.any((result < 0) | (result > 1)):
+            raise ValueError("RGBA values should be within 0-1 range")
+        return result
+    # Convert one at a time.
+    result = np.empty((len(c), 4), float)
+    for i, cc in enumerate(c):
+        result[i] = to_rgba(cc, alpha)
+    return result
+
+
+def to_rgb(c):
+    """Convert `c` to an RGB color, silently dropping the alpha channel.
+    """
+    return to_rgba(c)[:3]
+
+
+def to_hex(c, keep_alpha=False):
+    """Convert `c` to a hex color.
+
+    Uses the #rrggbb format if `keep_alpha` is False (the default), `#rrggbbaa`
+    otherwise.
+    """
+    c = to_rgba(c)
+    if not keep_alpha:
+        c = c[:3]
+    return "#" + "".join(format(int(np.round(val * 255)), "02x")
+                         for val in c)
+
+
+### Backwards-compatible color-conversion API
+
+cnames = CSS4_COLORS
+COLOR_NAMES = {'xkcd': XKCD_COLORS, 'css4': CSS4_COLORS}
 hexColorPattern = re.compile("\A#[a-fA-F0-9]{6}\Z")
 
 
-def hex2color(s):
+def rgb2hex(c):
+    'Given an rgb or rgba sequence of 0-1 floats, return the hex string'
+    return to_hex(c)
+
+
+def hex2color(c):
     """
     Take a hex string *s* and return the corresponding rgb 3-tuple
     Example: #efefef -> (0.93725, 0.93725, 0.93725)
     """
-    if not isinstance(s, six.string_types):
-        raise TypeError('hex2color requires a string argument')
-    if hexColorPattern.match(s) is None:
-        raise ValueError('invalid hex color string "%s"' % s)
-    return tuple([int(n, 16) / 255.0 for n in (s[1:3], s[3:5], s[5:7])])
+    return ColorConverter.to_rgb(c)
 
 
 class ColorConverter(object):
@@ -250,19 +277,12 @@ class ColorConverter(object):
     Ordinarily only the single instance instantiated in this module,
     *colorConverter*, is needed.
     """
-    colors = {
-        'b': (0.0, 0.0, 1.0),
-        'g': (0.0, 0.5, 0.0),
-        'r': (1.0, 0.0, 0.0),
-        'c': (0.0, 0.75, 0.75),
-        'm': (0.75, 0, 0.75),
-        'y': (0.75, 0.75, 0),
-        'k': (0.0, 0.0, 0.0),
-        'w': (1.0, 1.0, 1.0), }
 
-    cache = {}
+    colors = _colors_full_map
+    cache = _colors_full_map.cache
 
-    def to_rgb(self, arg):
+    @staticmethod
+    def to_rgb(arg):
         """
         Returns an *RGB* tuple of three floats from 0-1.
 
@@ -277,61 +297,10 @@ class ColorConverter(object):
 
         if *arg* is *RGBA*, the *A* will simply be discarded.
         """
-        # Gray must be a string to distinguish 3-4 grays from RGB or RGBA.
+        return to_rgb(arg)
 
-        try:
-            return self.cache[arg]
-        except KeyError:
-            pass
-        except TypeError:  # could be unhashable rgb seq
-            arg = tuple(arg)
-            try:
-                return self.cache[arg]
-            except KeyError:
-                pass
-            except TypeError:
-                raise ValueError(
-                    'to_rgb: arg "%s" is unhashable even inside a tuple'
-                    % (str(arg),))
-
-        try:
-            if cbook.is_string_like(arg):
-                argl = arg.lower()
-                color = self.colors.get(argl, None)
-                if color is None:
-                    str1 = cnames.get(argl, argl)
-                    if str1.startswith('#'):
-                        color = hex2color(str1)
-                    else:
-                        fl = float(argl)
-                        if fl < 0 or fl > 1:
-                            raise ValueError(
-                                'gray (string) must be in range 0-1')
-                        color = (fl,)*3
-            elif cbook.iterable(arg):
-                if len(arg) > 4 or len(arg) < 3:
-                    raise ValueError(
-                        'sequence length is %d; must be 3 or 4' % len(arg))
-                color = tuple(arg[:3])
-                if [x for x in color if (float(x) < 0) or (x > 1)]:
-                    # This will raise TypeError if x is not a number.
-                    raise ValueError(
-                        'number in rbg sequence outside 0-1 range')
-            else:
-                raise ValueError(
-                    'cannot convert argument to rgb sequence')
-
-            self.cache[arg] = color
-
-        except (KeyError, ValueError, TypeError) as exc:
-            raise ValueError(
-                'to_rgb: Invalid rgb arg "%s"\n%s' % (str(arg), exc))
-            # Error messages could be improved by handling TypeError
-            # separately; but this should be rare and not too hard
-            # for the user to figure out as-is.
-        return color
-
-    def to_rgba(self, arg, alpha=None):
+    @staticmethod
+    def to_rgba(arg, alpha=None):
         """
         Returns an *RGBA* tuple of four floats from 0-1.
 
@@ -341,41 +310,10 @@ class ColorConverter(object):
         If *arg* is an *RGBA* sequence and *alpha* is not *None*,
         *alpha* will replace the original *A*.
         """
-        try:
-            if arg.lower() == 'none':
-                return (0.0, 0.0, 0.0, 0.0)
-        except AttributeError:
-            pass
+        return to_rgba(arg, alpha)
 
-        try:
-            if not cbook.is_string_like(arg) and cbook.iterable(arg):
-                if len(arg) == 4:
-                    if any(float(x) < 0 or x > 1 for x in arg):
-                        raise ValueError(
-                            'number in rbga sequence outside 0-1 range')
-                    if alpha is None:
-                        return tuple(arg)
-                    if alpha < 0.0 or alpha > 1.0:
-                        raise ValueError("alpha must be in range 0-1")
-                    return arg[0], arg[1], arg[2], alpha
-                if len(arg) == 3:
-                    r, g, b = arg
-                    if any(float(x) < 0 or x > 1 for x in arg):
-                        raise ValueError(
-                            'number in rbg sequence outside 0-1 range')
-                else:
-                    raise ValueError(
-                            'length of rgba sequence should be either 3 or 4')
-            else:
-                r, g, b = self.to_rgb(arg)
-            if alpha is None:
-                alpha = 1.0
-            return r, g, b, alpha
-        except (TypeError, ValueError) as exc:
-            raise ValueError(
-                'to_rgba: Invalid rgba arg "%s"\n%s' % (str(arg), exc))
-
-    def to_rgba_array(self, c, alpha=None):
+    @staticmethod
+    def to_rgba_array(arg, alpha=None):
         """
         Returns a numpy array of *RGBA* tuples.
 
@@ -384,46 +322,12 @@ class ColorConverter(object):
         Special case to handle "no color": if *c* is "none" (case-insensitive),
         then an empty array will be returned.  Same for an empty list.
         """
-        try:
-            nc = len(c)
-        except TypeError:
-            raise ValueError(
-                "Cannot convert argument type %s to rgba array" % type(c))
-        try:
-            if nc == 0 or c.lower() == 'none':
-                return np.zeros((0, 4), dtype=np.float)
-        except AttributeError:
-            pass
-        try:
-            # Single value? Put it in an array with a single row.
-            return np.array([self.to_rgba(c, alpha)], dtype=np.float)
-        except ValueError:
-            if isinstance(c, np.ndarray):
-                if c.ndim != 2 and c.dtype.kind not in 'SU':
-                    raise ValueError("Color array must be two-dimensional")
-                if (c.ndim == 2 and c.shape[1] == 4 and c.dtype.kind == 'f'):
-                    if (c.ravel() > 1).any() or (c.ravel() < 0).any():
-                        raise ValueError(
-                            "number in rgba sequence is outside 0-1 range")
-                    result = np.asarray(c, np.float)
-                    if alpha is not None:
-                        if alpha > 1 or alpha < 0:
-                            raise ValueError("alpha must be in 0-1 range")
-                        result[:, 3] = alpha
-                    return result
-                    # This alpha operation above is new, and depends
-                    # on higher levels to refrain from setting alpha
-                    # to values other than None unless there is
-                    # intent to override any existing alpha values.
-
-            # It must be some other sequence of color specs.
-            result = np.zeros((nc, 4), dtype=np.float)
-            for i, cc in enumerate(c):
-                result[i] = self.to_rgba(cc, alpha)
-            return result
+        return to_rgba_array(arg, alpha)
 
 
 colorConverter = ColorConverter()
+
+### End of backwards-compatible color-conversion API
 
 
 def makeMappingArray(N, data, gamma=1.0):
@@ -449,7 +353,7 @@ def makeMappingArray(N, data, gamma=1.0):
 
     if six.callable(data):
         xind = np.linspace(0, 1, N) ** gamma
-        lut = np.clip(np.array(data(xind), dtype=np.float), 0, 1)
+        lut = np.clip(np.array(data(xind), dtype=float), 0, 1)
         return lut
 
     try:
@@ -472,7 +376,7 @@ def makeMappingArray(N, data, gamma=1.0):
             "data mapping points must have x in increasing order")
     # begin generation of lookup table
     x = x * (N - 1)
-    lut = np.zeros((N,), np.float)
+    lut = np.zeros((N,), float)
     xind = (N - 1) * np.linspace(0, 1, N) ** gamma
     ind = np.searchsorted(x, xind)[1:-1]
 
@@ -554,9 +458,9 @@ class Colormap(object):
             xa = np.array([X])
         else:
             vtype = 'array'
-            xma = ma.array(X, copy=True)  # Copy here to avoid side effects.
-            mask_bad = xma.mask           # Mask will be used below.
-            xa = xma.filled()             # Fill to avoid infs, etc.
+            xma = np.ma.array(X, copy=True)  # Copy here to avoid side effects.
+            mask_bad = xma.mask              # Mask will be used below.
+            xa = xma.filled()                # Fill to avoid infs, etc.
             del xma
 
         # Calculations with native byteorder are faster, and avoid a
@@ -665,6 +569,25 @@ class Colormap(object):
         """
         raise NotImplementedError()
 
+    def reversed(self, name=None):
+        """
+        Make a reversed instance of the Colormap.
+
+        .. note :: Function not implemented for base class.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name for the reversed colormap. If it's None the
+            name will be the name of the parent colormap + "_r".
+
+        Notes
+        -----
+        See :meth:`LinearSegmentedColormap.reversed` and
+        :meth:`ListedColormap.reversed`
+        """
+        raise NotImplementedError()
+
 
 class LinearSegmentedColormap(Colormap):
     """Colormap objects based on lookup tables using linear segments.
@@ -727,7 +650,7 @@ class LinearSegmentedColormap(Colormap):
         self._gamma = gamma
 
     def _init(self):
-        self._lut = np.ones((self.N + 3, 4), np.float)
+        self._lut = np.ones((self.N + 3, 4), float)
         self._lut[:-3, 0] = makeMappingArray(
             self.N, self._segmentdata['red'], self._gamma)
         self._lut[:-3, 1] = makeMappingArray(
@@ -784,6 +707,40 @@ class LinearSegmentedColormap(Colormap):
         """
         return LinearSegmentedColormap(self.name, self._segmentdata, lutsize)
 
+    def reversed(self, name=None):
+        """
+        Make a reversed instance of the Colormap.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name for the reversed colormap. If it's None the
+            name will be the name of the parent colormap + "_r".
+
+        Returns
+        -------
+        LinearSegmentedColormap
+            The reversed colormap.
+        """
+        if name is None:
+            name = self.name + "_r"
+
+        # Function factory needed to deal with 'late binding' issue.
+        def factory(dat):
+            def func_r(x):
+                return dat(1.0 - x)
+            return func_r
+
+        data_r = dict()
+        for key, data in six.iteritems(self._segmentdata):
+            if six.callable(data):
+                data_r[key] = factory(data)
+            else:
+                new_data = [(1.0 - x, y1, y0) for x, y0, y1 in reversed(data)]
+                data_r[key] = new_data
+
+        return LinearSegmentedColormap(name, data_r, self.N, self._gamma)
+
 
 class ListedColormap(Colormap):
     """Colormap object generated from a list of colors.
@@ -821,7 +778,8 @@ class ListedColormap(Colormap):
         if N is None:
             N = len(self.colors)
         else:
-            if cbook.is_string_like(self.colors):
+            if (cbook.is_string_like(self.colors) and
+                    cbook.is_hashable(self.colors)):
                 self.colors = [self.colors] * N
                 self.monochrome = True
             elif cbook.iterable(self.colors):
@@ -843,7 +801,7 @@ class ListedColormap(Colormap):
 
     def _init(self):
         rgba = colorConverter.to_rgba_array(self.colors)
-        self._lut = np.zeros((self.N + 3, 4), np.float)
+        self._lut = np.zeros((self.N + 3, 4), float)
         self._lut[:-3] = rgba
         self._isinit = True
         self._set_extremes()
@@ -854,6 +812,27 @@ class ListedColormap(Colormap):
         """
         colors = self(np.linspace(0, 1, lutsize))
         return ListedColormap(colors, name=self.name)
+
+    def reversed(self, name=None):
+        """
+        Make a reversed instance of the Colormap.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name for the reversed colormap. If it's None the
+            name will be the name of the parent colormap + "_r".
+
+        Returns
+        -------
+        ListedColormap
+            A reversed instance of the colormap.
+        """
+        if name is None:
+            name = self.name + "_r"
+
+        colors_r = list(reversed(self.colors))
+        return ListedColormap(colors_r, name=name, N=self.N)
 
 
 class Normalize(object):
@@ -894,29 +873,21 @@ class Normalize(object):
         Returns *result*, *is_scalar*, where *result* is a
         masked array matching *value*.  Float dtypes are preserved;
         integer types with two bytes or smaller are converted to
-        np.float32, and larger types are converted to np.float.
+        np.float32, and larger types are converted to np.float64.
         Preserving float32 when possible, and using in-place operations,
         can greatly improve speed for large arrays.
 
         Experimental; we may want to add an option to force the
         use of float32.
         """
-        if cbook.iterable(value):
-            is_scalar = False
-            result = ma.asarray(value)
-            if result.dtype.kind == 'f':
-                # this is overkill for lists of floats, but required
-                # to support pd.Series as input until we can reliable
-                # determine if result and value share memory in all cases
-                # (list, tuple, deque, ndarray, Series, ...)
-                result = result.copy()
-            elif result.dtype.itemsize > 2:
-                result = result.astype(np.float)
-            else:
-                result = result.astype(np.float32)
-        else:
-            is_scalar = True
-            result = ma.array([value]).astype(np.float)
+        is_scalar = not cbook.iterable(value)
+        if is_scalar:
+            value = [value]
+        dtype = np.min_scalar_type(value)
+        if np.issubdtype(dtype, np.integer) or dtype.type is np.bool_:
+            # bool_/int8/int16 -> float32; int32/int64 -> float64
+            dtype = np.promote_types(dtype, np.float32)
+        result = np.ma.array(value, dtype=dtype, copy=True)
         return result, is_scalar
 
     def __call__(self, value, clip=None):
@@ -933,20 +904,22 @@ class Normalize(object):
         result, is_scalar = self.process_value(value)
 
         self.autoscale_None(result)
-        vmin, vmax = self.vmin, self.vmax
+        # Convert at least to float, without losing precision.
+        (vmin,), _ = self.process_value(self.vmin)
+        (vmax,), _ = self.process_value(self.vmax)
         if vmin == vmax:
             result.fill(0)   # Or should it be all masked?  Or 0.5?
         elif vmin > vmax:
             raise ValueError("minvalue must be less than or equal to maxvalue")
         else:
-            vmin = float(vmin)
-            vmax = float(vmax)
             if clip:
-                mask = ma.getmask(result)
-                result = ma.array(np.clip(result.filled(vmax), vmin, vmax),
-                                  mask=mask)
+                mask = np.ma.getmask(result)
+                result = np.ma.array(np.clip(result.filled(vmax), vmin, vmax),
+                                     mask=mask)
             # ma division is very slow; we can take a shortcut
-            resdat = result.data
+            # use np.asarray so data passed in as an ndarray subclass are
+            # interpreted as an ndarray. See issue #6622.
+            resdat = np.asarray(result.data)
             resdat -= vmin
             resdat /= (vmax - vmin)
             result = np.ma.array(resdat, mask=result.mask, copy=False)
@@ -957,11 +930,11 @@ class Normalize(object):
     def inverse(self, value):
         if not self.scaled():
             raise ValueError("Not invertible until scaled")
-        vmin = float(self.vmin)
-        vmax = float(self.vmax)
+        (vmin,), _ = self.process_value(self.vmin)
+        (vmax,), _ = self.process_value(self.vmax)
 
         if cbook.iterable(value):
-            val = ma.asarray(value)
+            val = np.ma.asarray(value)
             return vmin + val * (vmax - vmin)
         else:
             return vmin + value * (vmax - vmin)
@@ -970,15 +943,15 @@ class Normalize(object):
         """
         Set *vmin*, *vmax* to min, max of *A*.
         """
-        self.vmin = ma.min(A)
-        self.vmax = ma.max(A)
+        self.vmin = np.ma.min(A)
+        self.vmax = np.ma.max(A)
 
     def autoscale_None(self, A):
         ' autoscale only None-valued vmin or vmax'
         if self.vmin is None and np.size(A) > 0:
-            self.vmin = ma.min(A)
+            self.vmin = np.ma.min(A)
         if self.vmax is None and np.size(A) > 0:
-            self.vmax = ma.max(A)
+            self.vmax = np.ma.max(A)
 
     def scaled(self):
         'return true if vmin and vmax set'
@@ -995,7 +968,7 @@ class LogNorm(Normalize):
 
         result, is_scalar = self.process_value(value)
 
-        result = ma.masked_less_equal(result, 0, copy=False)
+        result = np.ma.masked_less_equal(result, 0, copy=False)
 
         self.autoscale_None(result)
         vmin, vmax = self.vmin, self.vmax
@@ -1007,8 +980,8 @@ class LogNorm(Normalize):
             result.fill(0)
         else:
             if clip:
-                mask = ma.getmask(result)
-                result = ma.array(np.clip(result.filled(vmax), vmin, vmax),
+                mask = np.ma.getmask(result)
+                result = np.ma.array(np.clip(result.filled(vmax), vmin, vmax),
                                   mask=mask)
             # in-place equivalent of above can be much faster
             resdat = result.data
@@ -1032,8 +1005,8 @@ class LogNorm(Normalize):
         vmin, vmax = self.vmin, self.vmax
 
         if cbook.iterable(value):
-            val = ma.asarray(value)
-            return vmin * ma.power((vmax / vmin), val)
+            val = np.ma.asarray(value)
+            return vmin * np.ma.power((vmax / vmin), val)
         else:
             return vmin * pow((vmax / vmin), value)
 
@@ -1041,19 +1014,19 @@ class LogNorm(Normalize):
         """
         Set *vmin*, *vmax* to min, max of *A*.
         """
-        A = ma.masked_less_equal(A, 0, copy=False)
-        self.vmin = ma.min(A)
-        self.vmax = ma.max(A)
+        A = np.ma.masked_less_equal(A, 0, copy=False)
+        self.vmin = np.ma.min(A)
+        self.vmax = np.ma.max(A)
 
     def autoscale_None(self, A):
         ' autoscale only None-valued vmin or vmax'
         if self.vmin is not None and self.vmax is not None:
             return
-        A = ma.masked_less_equal(A, 0, copy=False)
+        A = np.ma.masked_less_equal(A, 0, copy=False)
         if self.vmin is None:
-            self.vmin = ma.min(A)
+            self.vmin = np.ma.min(A)
         if self.vmax is None:
-            self.vmax = ma.max(A)
+            self.vmax = np.ma.max(A)
 
 
 class SymLogNorm(Normalize):
@@ -1100,9 +1073,9 @@ class SymLogNorm(Normalize):
             result.fill(0)
         else:
             if clip:
-                mask = ma.getmask(result)
-                result = ma.array(np.clip(result.filled(vmax), vmin, vmax),
-                                  mask=mask)
+                mask = np.ma.getmask(result)
+                result = np.ma.array(np.clip(result.filled(vmax), vmin, vmax),
+                                     mask=mask)
             # in-place equivalent of above can be much faster
             resdat = self._transform(result.data)
             resdat -= self._lower
@@ -1141,13 +1114,13 @@ class SymLogNorm(Normalize):
         Calculates vmin and vmax in the transformed system.
         """
         vmin, vmax = self.vmin, self.vmax
-        arr = np.array([vmax, vmin]).astype(np.float)
+        arr = np.array([vmax, vmin]).astype(float)
         self._upper, self._lower = self._transform(arr)
 
     def inverse(self, value):
         if not self.scaled():
             raise ValueError("Not invertible until scaled")
-        val = ma.asarray(value)
+        val = np.ma.asarray(value)
         val = val * (self._upper - self._lower) + self._lower
         return self._inv_transform(val)
 
@@ -1155,8 +1128,8 @@ class SymLogNorm(Normalize):
         """
         Set *vmin*, *vmax* to min, max of *A*.
         """
-        self.vmin = ma.min(A)
-        self.vmax = ma.max(A)
+        self.vmin = np.ma.min(A)
+        self.vmax = np.ma.max(A)
         self._transform_vmin_vmax()
 
     def autoscale_None(self, A):
@@ -1164,9 +1137,9 @@ class SymLogNorm(Normalize):
         if self.vmin is not None and self.vmax is not None:
             pass
         if self.vmin is None:
-            self.vmin = ma.min(A)
+            self.vmin = np.ma.min(A)
         if self.vmax is None:
-            self.vmax = ma.max(A)
+            self.vmax = np.ma.max(A)
         self._transform_vmin_vmax()
 
 
@@ -1195,9 +1168,9 @@ class PowerNorm(Normalize):
         else:
             res_mask = result.data < 0
             if clip:
-                mask = ma.getmask(result)
-                result = ma.array(np.clip(result.filled(vmax), vmin, vmax),
-                                  mask=mask)
+                mask = np.ma.getmask(result)
+                result = np.ma.array(np.clip(result.filled(vmax), vmin, vmax),
+                                     mask=mask)
             resdat = result.data
             resdat -= vmin
             np.power(resdat, gamma, resdat)
@@ -1216,8 +1189,8 @@ class PowerNorm(Normalize):
         vmin, vmax = self.vmin, self.vmax
 
         if cbook.iterable(value):
-            val = ma.asarray(value)
-            return ma.power(val, 1. / gamma) * (vmax - vmin) + vmin
+            val = np.ma.asarray(value)
+            return np.ma.power(val, 1. / gamma) * (vmax - vmin) + vmin
         else:
             return pow(value, 1. / gamma) * (vmax - vmin) + vmin
 
@@ -1225,25 +1198,25 @@ class PowerNorm(Normalize):
         """
         Set *vmin*, *vmax* to min, max of *A*.
         """
-        self.vmin = ma.min(A)
+        self.vmin = np.ma.min(A)
         if self.vmin < 0:
             self.vmin = 0
             warnings.warn("Power-law scaling on negative values is "
                           "ill-defined, clamping to 0.")
 
-        self.vmax = ma.max(A)
+        self.vmax = np.ma.max(A)
 
     def autoscale_None(self, A):
         ' autoscale only None-valued vmin or vmax'
         if self.vmin is None and np.size(A) > 0:
-            self.vmin = ma.min(A)
+            self.vmin = np.ma.min(A)
             if self.vmin < 0:
                 self.vmin = 0
                 warnings.warn("Power-law scaling on negative values is "
                               "ill-defined, clamping to 0.")
 
         if self.vmax is None and np.size(A) > 0:
-            self.vmax = ma.max(A)
+            self.vmax = np.ma.max(A)
 
 
 class BoundaryNorm(Normalize):
@@ -1297,7 +1270,7 @@ class BoundaryNorm(Normalize):
             clip = self.clip
 
         xx, is_scalar = self.process_value(value)
-        mask = ma.getmaskarray(xx)
+        mask = np.ma.getmaskarray(xx)
         xx = np.atleast_1d(xx.filled(self.vmax + 1))
         if clip:
             np.clip(xx, self.vmin, self.vmax, out=xx)
@@ -1312,7 +1285,7 @@ class BoundaryNorm(Normalize):
             iret = (iret * scalefac).astype(np.int16)
         iret[xx < self.vmin] = -1
         iret[xx >= self.vmax] = max_col
-        ret = ma.array(iret, mask=mask)
+        ret = np.ma.array(iret, mask=mask)
         if is_scalar:
             ret = int(ret[0])  # assume python scalar
         return ret

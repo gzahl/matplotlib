@@ -16,7 +16,7 @@ from matplotlib import rcParams
 from matplotlib._pylab_helpers import Gcf
 import matplotlib.cbook as cbook
 from weakref import WeakKeyDictionary
-from matplotlib.externals import six
+import six
 import time
 import warnings
 
@@ -77,13 +77,36 @@ class ToolBase(object):
                       'experimental for now, the API will likely change in ' +
                       'version 2.1, and some tools might change name')
         self._name = name
+        self._toolmanager = toolmanager
         self._figure = None
-        self.toolmanager = toolmanager
-        self.figure = toolmanager.canvas.figure
 
     @property
     def figure(self):
         return self._figure
+
+    @figure.setter
+    def figure(self, figure):
+        self.set_figure(figure)
+
+    @property
+    def canvas(self):
+        if not self._figure:
+            return None
+        return self._figure.canvas
+
+    @property
+    def toolmanager(self):
+        return self._toolmanager
+
+    def set_figure(self, figure):
+        """
+        Assign a figure to the tool
+
+        Parameters
+        ----------
+        figure: `Figure`
+        """
+        self._figure = figure
 
     def trigger(self, sender, event, data=None):
         """
@@ -103,20 +126,6 @@ class ToolBase(object):
         """
 
         pass
-
-    @figure.setter
-    def figure(self, figure):
-        """
-        Set the figure
-
-        Set the figure to be affected by this tool
-
-        Parameters
-        ----------
-        figure: `Figure`
-        """
-
-        self._figure = figure
 
     @property
     def name(self):
@@ -138,6 +147,14 @@ class ToolToggleBase(ToolBase):
     Toggleable tool
 
     Every time it is triggered, it switches between enable and disable
+
+    Parameters
+    ----------
+    ``*args``
+        Variable length argument to be used by the Tool
+    ``**kwargs``
+        `toggled` if present and True, sets the initial state ot the Tool
+        Arbitrary keyword arguments to be consumed by the Tool
     """
 
     radio_group = None
@@ -150,9 +167,12 @@ class ToolToggleBase(ToolBase):
     cursor = None
     """Cursor to use when the tool is active"""
 
+    default_toggled = False
+    """Default of toggled state"""
+
     def __init__(self, *args, **kwargs):
+        self._toggled = kwargs.pop('toggled', self.default_toggled)
         ToolBase.__init__(self, *args, **kwargs)
-        self._toggled = False
 
     def trigger(self, sender, event, data=None):
         """Calls `enable` or `disable` based on `toggled` value"""
@@ -193,6 +213,24 @@ class ToolToggleBase(ToolBase):
 
         return self._toggled
 
+    def set_figure(self, figure):
+        toggled = self.toggled
+        if toggled:
+            if self.figure:
+                self.trigger(self, None)
+            else:
+                # if no figure the internal state is not changed
+                # we change it here so next call to trigger will change it back
+                self._toggled = False
+        ToolBase.set_figure(self, figure)
+        if toggled:
+            if figure:
+                self.trigger(self, None)
+            else:
+                # if there is no figure, triggen wont change the internal state
+                # we change it back
+                self._toggled = True
+
 
 class SetCursorBase(ToolBase):
     """
@@ -203,8 +241,7 @@ class SetCursorBase(ToolBase):
     """
     def __init__(self, *args, **kwargs):
         ToolBase.__init__(self, *args, **kwargs)
-        self._idDrag = self.figure.canvas.mpl_connect(
-            'motion_notify_event', self._set_cursor_cbk)
+        self._idDrag = None
         self._cursor = None
         self._default_cursor = cursors.POINTER
         self._last_cursor = self._default_cursor
@@ -214,6 +251,14 @@ class SetCursorBase(ToolBase):
         # process current tools
         for tool in self.toolmanager.tools.values():
             self._add_tool(tool)
+
+    def set_figure(self, figure):
+        if self._idDrag:
+            self.canvas.mpl_disconnect(self._idDrag)
+        ToolBase.set_figure(self, figure)
+        if figure:
+            self._idDrag = self.canvas.mpl_connect(
+                'motion_notify_event', self._set_cursor_cbk)
 
     def _tool_trigger_cbk(self, event):
         if event.tool.toggled:
@@ -266,9 +311,16 @@ class ToolCursorPosition(ToolBase):
     This tool runs in the background reporting the position of the cursor
     """
     def __init__(self, *args, **kwargs):
+        self._idDrag = None
         ToolBase.__init__(self, *args, **kwargs)
-        self._idDrag = self.figure.canvas.mpl_connect(
-            'motion_notify_event', self.send_message)
+
+    def set_figure(self, figure):
+        if self._idDrag:
+            self.canvas.mpl_disconnect(self._idDrag)
+        ToolBase.set_figure(self, figure)
+        if figure:
+            self._idDrag = self.canvas.mpl_connect(
+                'motion_notify_event', self.send_message)
 
     def send_message(self, event):
         """Call `matplotlib.backend_managers.ToolManager.message_event`"""
@@ -283,6 +335,16 @@ class ToolCursorPosition(ToolBase):
             except (ValueError, OverflowError):
                 pass
             else:
+                artists = [a for a in event.inaxes.mouseover_set
+                           if a.contains(event) and a.get_visible()]
+
+                if artists:
+                    a = max(artists, key=lambda x: x.zorder)
+                    if a is not event.inaxes.patch:
+                        data = a.get_cursor_data(event)
+                        if data is not None:
+                            s += ' [%s]' % a.format_cursor_data(data)
+
                 message = s
         self.toolmanager.message_event(message, self)
 
@@ -368,24 +430,79 @@ class ToolEnableNavigation(ToolBase):
                 a.set_navigate(i == n)
 
 
-class ToolGrid(ToolToggleBase):
-    """Tool to toggle the grid of the figure"""
+class _ToolGridBase(ToolBase):
+    """Common functionality between ToolGrid and ToolMinorGrid."""
 
-    description = 'Toogle Grid'
-    default_keymap = rcParams['keymap.grid']
+    _cycle = [(False, False), (True, False), (True, True), (False, True)]
 
     def trigger(self, sender, event, data=None):
-        if event.inaxes is None:
+        ax = event.inaxes
+        if ax is None:
             return
-        ToolToggleBase.trigger(self, sender, event, data)
+        try:
+            x_state, x_which, y_state, y_which = self._get_next_grid_states(ax)
+        except ValueError:
+            pass
+        else:
+            ax.grid(x_state, which=x_which, axis="x")
+            ax.grid(y_state, which=y_which, axis="y")
+            ax.figure.canvas.draw_idle()
 
-    def enable(self, event):
-        event.inaxes.grid(True)
-        self.figure.canvas.draw_idle()
+    @staticmethod
+    def _get_uniform_grid_state(ticks):
+        """
+        Check whether all grid lines are in the same visibility state.
 
-    def disable(self, event):
-        event.inaxes.grid(False)
-        self.figure.canvas.draw_idle()
+        Returns True/False if all grid lines are on or off, None if they are
+        not all in the same state.
+        """
+        if all(tick.gridOn for tick in ticks):
+            return True
+        elif not any(tick.gridOn for tick in ticks):
+            return False
+        else:
+            return None
+
+
+class ToolGrid(_ToolGridBase):
+    """Tool to toggle the major grids of the figure"""
+
+    description = 'Toogle major grids'
+    default_keymap = rcParams['keymap.grid']
+
+    def _get_next_grid_states(self, ax):
+        if None in map(self._get_uniform_grid_state,
+                       [ax.xaxis.minorTicks, ax.yaxis.minorTicks]):
+            # Bail out if minor grids are not in a uniform state.
+            raise ValueError
+        x_state, y_state = map(self._get_uniform_grid_state,
+                               [ax.xaxis.majorTicks, ax.yaxis.majorTicks])
+        cycle = self._cycle
+        # Bail out (via ValueError) if major grids are not in a uniform state.
+        x_state, y_state = (
+            cycle[(cycle.index((x_state, y_state)) + 1) % len(cycle)])
+        return (x_state, "major" if x_state else "both",
+                y_state, "major" if y_state else "both")
+
+
+class ToolMinorGrid(_ToolGridBase):
+    """Tool to toggle the major and minor grids of the figure"""
+
+    description = 'Toogle major and minor grids'
+    default_keymap = rcParams['keymap.grid_minor']
+
+    def _get_next_grid_states(self, ax):
+        if None in map(self._get_uniform_grid_state,
+                       [ax.xaxis.majorTicks, ax.yaxis.majorTicks]):
+            # Bail out if major grids are not in a uniform state.
+            raise ValueError
+        x_state, y_state = map(self._get_uniform_grid_state,
+                               [ax.xaxis.minorTicks, ax.yaxis.minorTicks])
+        cycle = self._cycle
+        # Bail out (via ValueError) if minor grids are not in a uniform state.
+        x_state, y_state = (
+            cycle[(cycle.index((x_state, y_state)) + 1) % len(cycle)])
+        return x_state, "both", y_state, "both"
 
 
 class ToolFullScreen(ToolToggleBase):
@@ -458,16 +575,17 @@ class ToolViewsPositions(ToolBase):
         self.home_views = WeakKeyDictionary()
         ToolBase.__init__(self, *args, **kwargs)
 
-    def add_figure(self):
+    def add_figure(self, figure):
         """Add the current figure to the stack of views and positions"""
-        if self.figure not in self.views:
-            self.views[self.figure] = cbook.Stack()
-            self.positions[self.figure] = cbook.Stack()
-            self.home_views[self.figure] = WeakKeyDictionary()
+
+        if figure not in self.views:
+            self.views[figure] = cbook.Stack()
+            self.positions[figure] = cbook.Stack()
+            self.home_views[figure] = WeakKeyDictionary()
             # Define Home
-            self.push_current()
+            self.push_current(figure)
             # Make sure we add a home view for new axes as they're added
-            self.figure.add_axobserver(lambda fig: self.update_home_views())
+            figure.add_axobserver(lambda fig: self.update_home_views(fig))
 
     def clear(self, figure):
         """Reset the axes stack"""
@@ -508,18 +626,19 @@ class ToolViewsPositions(ToolBase):
 
         self.figure.canvas.draw_idle()
 
-    def push_current(self):
+    def push_current(self, figure=None):
         """
         Push the current view limits and position onto their respective stacks
         """
-
+        if not figure:
+            figure = self.figure
         views = WeakKeyDictionary()
         pos = WeakKeyDictionary()
-        for a in self.figure.get_axes():
+        for a in figure.get_axes():
             views[a] = a._get_view()
             pos[a] = self._axes_pos(a)
-        self.views[self.figure].push(views)
-        self.positions[self.figure].push(pos)
+        self.views[figure].push(views)
+        self.positions[figure].push(pos)
 
     def _axes_pos(self, ax):
         """
@@ -539,15 +658,17 @@ class ToolViewsPositions(ToolBase):
         return (ax.get_position(True).frozen(),
                 ax.get_position().frozen())
 
-    def update_home_views(self):
+    def update_home_views(self, figure=None):
         """
         Make sure that self.home_views has an entry for all axes present in the
         figure
         """
 
-        for a in self.figure.get_axes():
-            if a not in self.home_views[self.figure]:
-                self.home_views[self.figure][a] = a._get_view()
+        if not figure:
+            figure = self.figure
+        for a in figure.get_axes():
+            if a not in self.home_views[figure]:
+                self.home_views[figure][a] = a._get_view()
 
     def refresh_locators(self):
         """Redraw the canvases, update the locators"""
@@ -592,7 +713,7 @@ class ViewsPositionsBase(ToolBase):
     _on_trigger = None
 
     def trigger(self, sender, event, data=None):
-        self.toolmanager.get_tool(_views_positions).add_figure()
+        self.toolmanager.get_tool(_views_positions).add_figure(self.figure)
         getattr(self.toolmanager.get_tool(_views_positions),
                 self._on_trigger)()
         self.toolmanager.get_tool(_views_positions).update_view()
@@ -672,7 +793,7 @@ class ZoomPanBase(ToolToggleBase):
         self.figure.canvas.mpl_disconnect(self._idScroll)
 
     def trigger(self, sender, event, data=None):
-        self.toolmanager.get_tool(_views_positions).add_figure()
+        self.toolmanager.get_tool(_views_positions).add_figure(self.figure)
         ToolToggleBase.trigger(self, sender, event, data)
 
     def scroll_zoom(self, event):
@@ -909,6 +1030,7 @@ default_tools = {'home': ToolHome, 'back': ToolBack, 'forward': ToolForward,
                  'subplots': 'ToolConfigureSubplots',
                  'save': 'ToolSaveFigure',
                  'grid': ToolGrid,
+                 'grid_minor': ToolMinorGrid,
                  'fullscreen': ToolFullScreen,
                  'quit': ToolQuit,
                  'quit_all': ToolQuitAll,
@@ -924,8 +1046,7 @@ default_tools = {'home': ToolHome, 'back': ToolBack, 'forward': ToolForward,
 """Default tools"""
 
 default_toolbar_tools = [['navigation', ['home', 'back', 'forward']],
-                         ['zoompan', ['pan', 'zoom']],
-                         ['layout', ['subplots']],
+                         ['zoompan', ['pan', 'zoom', 'subplots']],
                          ['io', ['save']]]
 """Default tools in the toolbar"""
 
