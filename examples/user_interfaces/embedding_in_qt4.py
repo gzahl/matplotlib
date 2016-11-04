@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 
 # embedding_in_qt4.py --- Simple Qt4 application embedding matplotlib canvases
 #

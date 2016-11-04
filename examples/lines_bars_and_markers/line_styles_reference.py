@@ -21,7 +21,7 @@ def nice_repr(text):
 
 
 # Plot all line styles.
-fig, ax = plt.subplots()
+f, ax = plt.subplots()
 
 linestyles = ['-', '--', '-.', ':']
 for y, linestyle in enumerate(linestyles):

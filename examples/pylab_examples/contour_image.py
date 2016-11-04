@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 '''
 Test combinations of contouring, filled contouring, and image plotting.
 For contour labelling, see contour_demo.py.

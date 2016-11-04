@@ -2,18 +2,21 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
+from matplotlib.externals import six
+
 import os
 import shutil
 
 import numpy as np
+import nose
 from nose.plugins.skip import SkipTest
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.compat import subprocess
 from matplotlib.testing.compare import compare_images, ImageComparisonFailure
-from matplotlib.testing.decorators import (_image_directories, switch_backend,
-                                           cleanup)
+from matplotlib.testing.decorators import _image_directories, switch_backend
+
 
 baseline_dir, result_dir = _image_directories(lambda: 'dummy func')
 
@@ -76,7 +79,6 @@ def create_figure():
 
 
 # test compiling a figure to pdf with xelatex
-@cleanup(style='classic')
 @switch_backend('pgf')
 def test_xelatex():
     if not check_for('xelatex'):
@@ -90,14 +92,8 @@ def test_xelatex():
 
 
 # test compiling a figure to pdf with pdflatex
-@cleanup(style='classic')
 @switch_backend('pgf')
 def test_pdflatex():
-    import os
-    if os.environ.get('APPVEYOR', False):
-        from matplotlib.testing import xfail
-        xfail("pdflatex test does not work on appveyor due "
-              "to missing latex fonts")
     if not check_for('pdflatex'):
         raise SkipTest('pdflatex + pgf is required')
 
@@ -112,7 +108,6 @@ def test_pdflatex():
 
 
 # test updating the rc parameters for each figure
-@cleanup(style='classic')
 @switch_backend('pgf')
 def test_rcupdate():
     if not check_for('xelatex') or not check_for('pdflatex'):
@@ -134,18 +129,14 @@ def test_rcupdate():
                     'pgf.preamble': ['\\usepackage[utf8x]{inputenc}',
                                      '\\usepackage[T1]{fontenc}',
                                      '\\usepackage{sfmath}']})
-    tol = (6, 0)
-    original_params = mpl.rcParams.copy()
+    tol = (4, 0)
     for i, rc_set in enumerate(rc_sets):
-        mpl.rcParams.clear()
-        mpl.rcParams.update(original_params)
         mpl.rcParams.update(rc_set)
         create_figure()
         compare_figure('pgf_rcupdate%d.pdf' % (i + 1), tol=tol[i])
 
 
 # test backend-side clipping, since large numbers are not supported by TeX
-@cleanup(style='classic')
 @switch_backend('pgf')
 def test_pathclip():
     if not check_for('xelatex'):
@@ -164,7 +155,6 @@ def test_pathclip():
 
 
 # test mixed mode rendering
-@cleanup(style='classic')
 @switch_backend('pgf')
 def test_mixedmode():
     if not check_for('xelatex'):
@@ -181,7 +171,6 @@ def test_mixedmode():
 
 
 # test bbox_inches clipping
-@cleanup(style='classic')
 @switch_backend('pgf')
 def test_bbox_inches():
     if not check_for('xelatex'):

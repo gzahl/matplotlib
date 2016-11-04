@@ -8,9 +8,7 @@ below, try substituting 'scatter' for 'hexbin'.
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Fixing random state for reproducibility
-np.random.seed(19680801)
-
+np.random.seed(0)
 n = 100000
 x = np.random.standard_normal(n)
 y = 2.0 + 3.0 * x + 4.0 * np.random.standard_normal(n)
@@ -19,20 +17,19 @@ xmax = x.max()
 ymin = y.min()
 ymax = y.max()
 
-fig, axs = plt.subplots(ncols=2, sharey=True, figsize=(7, 4))
-fig.subplots_adjust(hspace=0.5, left=0.07, right=0.93)
-ax = axs[0]
-hb = ax.hexbin(x, y, gridsize=50, cmap='inferno')
-ax.axis([xmin, xmax, ymin, ymax])
-ax.set_title("Hexagon binning")
-cb = fig.colorbar(hb, ax=ax)
+plt.subplots_adjust(hspace=0.5)
+plt.subplot(121)
+plt.hexbin(x, y, cmap=plt.cm.YlOrRd_r)
+plt.axis([xmin, xmax, ymin, ymax])
+plt.title("Hexagon binning")
+cb = plt.colorbar()
 cb.set_label('counts')
 
-ax = axs[1]
-hb = ax.hexbin(x, y, gridsize=50, bins='log', cmap='inferno')
-ax.axis([xmin, xmax, ymin, ymax])
-ax.set_title("With a log color scale")
-cb = fig.colorbar(hb, ax=ax)
+plt.subplot(122)
+plt.hexbin(x, y, bins='log', cmap=plt.cm.YlOrRd_r)
+plt.axis([xmin, xmax, ymin, ymax])
+plt.title("With a log color scale")
+cb = plt.colorbar()
 cb.set_label('log10(N)')
 
 plt.show()

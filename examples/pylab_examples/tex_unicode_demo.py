@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 This demo is tex_demo.py modified to have unicode. See that file for
@@ -18,8 +19,9 @@ s = np.cos(2*2*np.pi*t) + 2
 plt.plot(t, s)
 
 plt.xlabel(r'\textbf{time (s)}')
-plt.ylabel('\\textit{Velocity (\u00B0/sec)}', fontsize=16)
-plt.title(r'\TeX\ is Number $\displaystyle\sum_{n=1}^\infty'
-          r'\frac{-e^{i\pi}}{2^n}$!', fontsize=16, color='r')
+plt.ylabel(r'\textit{Velocity (\u00B0/sec)}', fontsize=16)
+plt.title(r"\TeX\ is Number \
+          $\displaystyle\sum_{n=1}^\infty\frac{-e^{i\pi}}{2^n}$!",
+          fontsize=16, color='r')
 plt.grid(True)
 plt.show()

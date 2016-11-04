@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Illustrate some of the more advanced things that one can do with
 contour labels.

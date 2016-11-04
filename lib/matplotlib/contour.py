@@ -5,8 +5,8 @@ labelling for the axes class
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
-from six.moves import xrange
+from matplotlib.externals import six
+from matplotlib.externals.six.moves import xrange
 
 import warnings
 import matplotlib as mpl
@@ -1133,7 +1133,7 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         # add label colors
         cm.ScalarMappable.changed(self)
 
-    def _autolev(self, N):
+    def _autolev(self, z, N):
         """
         Select contour levels to span the data.
 
@@ -1148,7 +1148,7 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
             if self.logscale:
                 self.locator = ticker.LogLocator()
             else:
-                self.locator = ticker.MaxNLocator(N + 1, min_n_ticks=1)
+                self.locator = ticker.MaxNLocator(N + 1)
         zmax = self.zmax
         zmin = self.zmin
         lev = self.locator.tick_values(zmin, zmax)
@@ -1169,12 +1169,12 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
         self._auto = False
         if self.levels is None:
             if len(args) == 0:
-                lev = self._autolev(7)
+                lev = self._autolev(z, 7)
             else:
                 level_arg = args[0]
                 try:
                     if type(level_arg) == int:
-                        lev = self._autolev(level_arg)
+                        lev = self._autolev(z, level_arg)
                     else:
                         lev = np.asarray(level_arg).astype(np.float64)
                 except:
@@ -1348,6 +1348,11 @@ class ContourSet(cm.ScalarMappable, ContourLabeler):
 
         Returns a tuple containing the contour, segment, index of
         segment, x & y of segment point and distance to minimum point.
+
+        Call signature::
+
+          conmin,segmin,imin,xmin,ymin,dmin = find_nearest_contour(
+                     self, x, y, indices=None, pixel=True )
 
         Optional keyword arguments:
 
@@ -1542,12 +1547,12 @@ class QuadContourSet(ContourSet):
             raise TypeError("Too many arguments to %s; see help(%s)" %
                             (fn, fn))
         z = ma.masked_invalid(z, copy=False)
-        self.zmax = float(z.max())
-        self.zmin = float(z.min())
+        self.zmax = ma.maximum(z)
+        self.zmin = ma.minimum(z)
         if self.logscale and self.zmin <= 0:
             z = ma.masked_where(z <= 0, z)
             warnings.warn('Log scale: values of z <= 0 have been masked')
-            self.zmin = float(z.min())
+            self.zmin = z.min()
         self._contour_level_args(z, args)
         return (x, y, z)
 

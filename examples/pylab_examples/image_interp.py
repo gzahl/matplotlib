@@ -48,10 +48,6 @@ suggested.
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Fixing random state for reproducibility
-np.random.seed(19680801)
-
-
 A = np.random.rand(5, 5)
 plt.figure(1)
 plt.imshow(A, interpolation='nearest')

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 demonstrate adding a FigureCanvasGTK3Agg widget to a Gtk.ScrolledWindow
 using GTK3 accessed via pygobject

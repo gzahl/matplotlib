@@ -7,14 +7,19 @@ matplotlibrc file; see http://matplotlib.org/matplotlibrc
 import matplotlib.pyplot as plt
 import numpy as np
 
-x = np.arange(120)
-x.shape = (10, 12)
+x = np.arange(100.0)
+x.shape = (10, 10)
 
 interp = 'bilinear'
-fig, axs = plt.subplots(nrows=2, sharex=True, figsize=(3, 5))
-axs[0].set_title('blue should be up')
-axs[0].imshow(x, origin='upper', interpolation=interp)
+#interp = 'nearest'
+lim = -2, 11, -2, 6
+plt.subplot(211, facecolor='g')
+plt.title('blue should be up')
+plt.imshow(x, origin='upper', interpolation=interp)
+#plt.axis(lim)
 
-axs[1].set_title('blue should be down')
-axs[1].imshow(x, origin='lower', interpolation=interp)
+plt.subplot(212, facecolor='y')
+plt.title('blue should be down')
+plt.imshow(x, origin='lower', interpolation=interp)
+#plt.axis(lim)
 plt.show()

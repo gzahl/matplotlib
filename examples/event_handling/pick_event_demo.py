@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 
 You can enable picking by setting the "picker" property of an artist

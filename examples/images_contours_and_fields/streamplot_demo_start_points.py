@@ -1,26 +1,29 @@
 """
-Demo of the streamplot function with starting points.
+Demo of the `streamplot` function.
 
-This example shows how to fix the streamlines that are plotted, by passing
-an array of seed points to the `start_points` keyword argument.
+A streamplot, or streamline plot, is used to display 2D vector fields. This
+example shows a few features of the stream plot function:
+
+    * Varying the color along a streamline.
+    * Varying the density of streamlines.
+    * Varying the line width along a stream line.
 """
 import numpy as np
 import matplotlib.pyplot as plt
+plt.ion()
 
-Y, X = np.mgrid[-3:3:100j, -3:3:100j]
-U = -1 - X**2 + Y
-V = 1 + X - Y**2
+X, Y = (np.linspace(-3, 3, 100),
+        np.linspace(-3, 3, 100))
 
-# 5 points along the first diagonal and a point in the left upper quadrant
-seed_points = np.array([[-2, -1, 0, 1, 2, -1], [-2, -1,  0, 1, 2, 2]])
+U, V = np.mgrid[-3:3:100j, 0:0:100j]
 
-fig, ax = plt.subplots()
-strm = ax.streamplot(X, Y, U, V, color=U, linewidth=2,
-                     cmap=plt.cm.autumn, start_points=seed_points.T)
-fig.colorbar(strm.lines)
+seed_points = np.array([[-2, 0, 1], [-2, 0, 1]])
 
-ax.plot(seed_points[0], seed_points[1], 'bo')
+fig0, ax0 = plt.subplots()
+strm = ax0.streamplot(X, Y, U, V, color=U, linewidth=2,
+                      cmap=plt.cm.autumn, start_points=seed_points.T)
+fig0.colorbar(strm.lines)
 
-ax.axis((-3, 3, -3, 3))
+ax0.plot(seed_points[0], seed_points[1], 'bo')
 
-plt.show()
+ax0.axis((-3, 3, -3, 3))

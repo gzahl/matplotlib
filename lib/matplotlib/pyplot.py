@@ -18,7 +18,7 @@ is recommended that the namespaces be kept separate, e.g.::
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
+from matplotlib.externals import six
 
 import sys
 import warnings
@@ -29,8 +29,8 @@ import matplotlib
 import matplotlib.colorbar
 from matplotlib import style
 from matplotlib import _pylab_helpers, interactive
-from matplotlib.cbook import (dedent, silent_list, is_string_like, is_numlike,
-                              _string_to_bool)
+from matplotlib.cbook import dedent, silent_list, is_string_like, is_numlike
+from matplotlib.cbook import _string_to_bool
 from matplotlib import docstring
 from matplotlib.backend_bases import FigureCanvasBase
 from matplotlib.figure import Figure, figaspect
@@ -121,8 +121,7 @@ def install_repl_displayhook():
     Install a repl display hook so that any stale figure are automatically
     redrawn when control is returned to the repl.
 
-    This works with IPython terminals and kernels,
-    as well as vanilla python shells.
+    This works with both IPython terminals and vanilla python shells.
     """
     global _IP_REGISTERED
     global _INSTALL_FIG_OBSERVER
@@ -155,13 +154,6 @@ def install_repl_displayhook():
 
             _IP_REGISTERED = post_execute
             _INSTALL_FIG_OBSERVER = False
-
-            # trigger IPython's eventloop integration, if available
-            from IPython.core.pylabtools import backend2gui
-
-            ipython_gui_name = backend2gui.get(get_backend())
-            if ipython_gui_name:
-                ip.enable_gui(ipython_gui_name)
         else:
             _INSTALL_FIG_OBSERVER = True
 
@@ -399,7 +391,7 @@ def xkcd(scale=1, length=100, randomness=2):
     from matplotlib import patheffects
     context = rc_context()
     try:
-        rcParams['font.family'] = ['xkcd', 'Humor Sans', 'Comic Sans MS']
+        rcParams['font.family'] = ['Humor Sans', 'Comic Sans MS']
         rcParams['font.size'] = 14.0
         rcParams['path.sketch'] = (scale, length, randomness)
         rcParams['path.effects'] = [
@@ -919,7 +911,7 @@ def gca(**kwargs):
     current figure matching the given keyword args, or create one.
 
     Examples
-    --------
+    ---------
     To get the current polar axes on the current figure::
 
         plt.gca(projection='polar')
@@ -1038,119 +1030,115 @@ def subplot(*args, **kwargs):
 
 
 def subplots(nrows=1, ncols=1, sharex=False, sharey=False, squeeze=True,
-             subplot_kw=None, gridspec_kw=None, **fig_kw):
+                subplot_kw=None, gridspec_kw=None, **fig_kw):
     """
-    Create a figure and a set of subplots
+    Create a figure with a set of subplots already made.
 
     This utility wrapper makes it convenient to create common layouts of
     subplots, including the enclosing figure object, in a single call.
 
-    Parameters
-    ----------
-    nrows, ncols : int, optional, default: 1
-        Number of rows/columns of the subplot grid.
+    Keyword arguments:
 
-    sharex, sharey : bool or {'none', 'all', 'row', 'col'}, default: False
-        Controls sharing of properties among x (`sharex`) or y (`sharey`)
-        axes:
+      *nrows* : int
+        Number of rows of the subplot grid.  Defaults to 1.
 
-            - True or 'all': x- or y-axis will be shared among all
-              subplots.
-            - False or 'none': each subplot x- or y-axis will be
-              independent.
-            - 'row': each subplot row will share an x- or y-axis.
-            - 'col': each subplot column will share an x- or y-axis.
+      *ncols* : int
+        Number of columns of the subplot grid.  Defaults to 1.
 
-        When subplots have a shared x-axis along a column, only the x tick
-        labels of the bottom subplot are visible.  Similarly, when subplots
-        have a shared y-axis along a row, only the y tick labels of the first
-        column subplot are visible.
+      *sharex* : string or bool
+        If *True*, the X axis will be shared amongst all subplots.  If
+        *True* and you have multiple rows, the x tick labels on all but
+        the last row of plots will have visible set to *False*
+        If a string must be one of "row", "col", "all", or "none".
+        "all" has the same effect as *True*, "none" has the same effect
+        as *False*.
+        If "row", each subplot row will share a X axis.
+        If "col", each subplot column will share a X axis and the x tick
+        labels on all but the last row will have visible set to *False*.
 
-    squeeze : bool, optional, default: True
-        - If True, extra dimensions are squeezed out from the returned Axes
-          object:
+      *sharey* : string or bool
+        If *True*, the Y axis will be shared amongst all subplots. If
+        *True* and you have multiple columns, the y tick labels on all but
+        the first column of plots will have visible set to *False*
+        If a string must be one of "row", "col", "all", or "none".
+        "all" has the same effect as *True*, "none" has the same effect
+        as *False*.
+        If "row", each subplot row will share a Y axis and the y tick
+        labels on all but the first column will have visible set to *False*.
+        If "col", each subplot column will share a Y axis.
 
-            - if only one subplot is constructed (nrows=ncols=1), the
-              resulting single Axes object is returned as a scalar.
-            - for Nx1 or 1xN subplots, the returned object is a 1D numpy
-              object array of Axes objects are returned as numpy 1D arrays.
-            - for NxM, subplots with N>1 and M>1 are returned as a 2D arrays.
+      *squeeze* : bool
+        If *True*, extra dimensions are squeezed out from the
+        returned axis object:
 
-        - If False, no squeezing at all is done: the returned Axes object is
-          always a 2D array containing Axes instances, even if it ends up
-          being 1x1.
+        - if only one subplot is constructed (nrows=ncols=1), the
+          resulting single Axis object is returned as a scalar.
 
-    subplot_kw : dict, optional
+        - for Nx1 or 1xN subplots, the returned object is a 1-d numpy
+          object array of Axis objects are returned as numpy 1-d
+          arrays.
+
+        - for NxM subplots with N>1 and M>1 are returned as a 2d
+          array.
+
+        If *False*, no squeezing at all is done: the returned axis
+        object is always a 2-d array containing Axis instances, even if it
+        ends up being 1x1.
+
+      *subplot_kw* : dict
         Dict with keywords passed to the
-        :meth:`~matplotlib.figure.Figure.add_subplot` call used to create each
-        subplot.
+        :meth:`~matplotlib.figure.Figure.add_subplot` call used to
+        create each subplots.
 
-    gridspec_kw : dict, optional
+      *gridspec_kw* : dict
         Dict with keywords passed to the
-        :class:`~matplotlib.gridspec.GridSpec` constructor used to create the
-        grid the subplots are placed on.
+        :class:`~matplotlib.gridspec.GridSpec` constructor used to create
+        the grid the subplots are placed on.
 
-    fig_kw : dict, optional
+      *fig_kw* : dict
         Dict with keywords passed to the :func:`figure` call.  Note that all
         keywords not recognized above will be automatically included here.
 
-    Returns
-    -------
-    fig : :class:`matplotlib.figure.Figure` object
+    Returns:
 
-    ax : Axes object or array of Axes objects.
+    fig, ax : tuple
 
-        ax can be either a single :class:`matplotlib.axes.Axes` object or an
-        array of Axes objects if more than one subplot was created.  The
-        dimensions of the resulting array can be controlled with the squeeze
+      - *fig* is the :class:`matplotlib.figure.Figure` object
+
+      - *ax* can be either a single axis object or an array of axis
+        objects if more than one subplot was created.  The dimensions
+        of the resulting array can be controlled with the squeeze
         keyword, see above.
 
-    Examples
-    --------
-    First create some toy data:
+    Examples::
 
-    >>> x = np.linspace(0, 2*np.pi, 400)
-    >>> y = np.sin(x**2)
+        x = np.linspace(0, 2*np.pi, 400)
+        y = np.sin(x**2)
 
-    Creates just a figure and only one subplot
+        # Just a figure and one subplot
+        f, ax = plt.subplots()
+        ax.plot(x, y)
+        ax.set_title('Simple plot')
 
-    >>> fig, ax = plt.subplots()
-    >>> ax.plot(x, y)
-    >>> ax.set_title('Simple plot')
+        # Two subplots, unpack the output array immediately
+        f, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
+        ax1.plot(x, y)
+        ax1.set_title('Sharing Y axis')
+        ax2.scatter(x, y)
 
-    Creates two subplots and unpacks the output array immediately
+        # Four polar axes
+        plt.subplots(2, 2, subplot_kw=dict(polar=True))
 
-    >>> f, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
-    >>> ax1.plot(x, y)
-    >>> ax1.set_title('Sharing Y axis')
-    >>> ax2.scatter(x, y)
+        # Share a X axis with each column of subplots
+        plt.subplots(2, 2, sharex='col')
 
-    Creates four polar axes, and accesses them through the returned array
+        # Share a Y axis with each row of subplots
+        plt.subplots(2, 2, sharey='row')
 
-    >>> fig, axes = plt.subplots(2, 2, subplot_kw=dict(polar=True))
-    >>> axes[0, 0].plot(x, y)
-    >>> axes[1, 1].scatter(x, y)
-
-    Share a X axis with each column of subplots
-
-    >>> plt.subplots(2, 2, sharex='col')
-
-    Share a Y axis with each row of subplots
-
-    >>> plt.subplots(2, 2, sharey='row')
-
-    Share both X and Y axes with all subplots
-
-    >>> plt.subplots(2, 2, sharex='all', sharey='all')
-
-    Note that this is the same as
-
-    >>> plt.subplots(2, 2, sharex=True, sharey=True)
-
-    See Also
-    --------
-    figure
-    subplot
+        # Share a X and Y axis with all subplots
+        plt.subplots(2, 2, sharex='all', sharey='all')
+        # same as
+        plt.subplots(2, 2, sharex=True, sharey=True)
     """
     fig = figure(**fig_kw)
     axs = fig.subplots(nrows=nrows, ncols=ncols, sharex=sharex, sharey=sharey,
@@ -1159,12 +1147,11 @@ def subplots(nrows=1, ncols=1, sharex=False, sharey=False, squeeze=True,
     return fig, axs
 
 
-def subplot2grid(shape, loc, rowspan=1, colspan=1, fig=None, **kwargs):
+def subplot2grid(shape, loc, rowspan=1, colspan=1, **kwargs):
     """
     Create a subplot in a grid.  The grid is specified by *shape*, at
     location of *loc*, spanning *rowspan*, *colspan* cells in each
-    direction.  The index for loc is 0-based.  The current figure will
-    be used unless *fig* is specified. ::
+    direction.  The index for loc is 0-based. ::
 
       subplot2grid(shape, loc, rowspan=1, colspan=1)
 
@@ -1175,9 +1162,7 @@ def subplot2grid(shape, loc, rowspan=1, colspan=1, fig=None, **kwargs):
       subplot(subplotspec)
     """
 
-    if fig is None:
-        fig = gcf()
-
+    fig = gcf()
     s1, s2 = shape
     subplotspec = GridSpec(s1, s2).new_subplotspec(loc,
                                                    rowspan=rowspan,
@@ -2062,7 +2047,7 @@ def colormaps():
     .. [#] Rainbow colormaps, ``jet`` in particular, are considered a poor
       choice for scientific visualization by many researchers: `Rainbow Color
       Map (Still) Considered Harmful
-      <http://ieeexplore.ieee.org/xpl/articleDetails.jsp?arnumber=4118486>`_
+      <http://www.jwave.vt.edu/%7Erkriz/Projects/create_color_table/color_07.pdf>`_
 
     .. [#] Resembles "BkBlAqGrYeOrReViWh200" from NCAR Command
       Language. See `Color Table Gallery
@@ -2603,8 +2588,7 @@ def boxplot(x, notch=None, sym=None, vert=None, whis=None, positions=None,
             conf_intervals=None, meanline=None, showmeans=None, showcaps=None,
             showbox=None, showfliers=None, boxprops=None, labels=None,
             flierprops=None, medianprops=None, meanprops=None, capprops=None,
-            whiskerprops=None, manage_xticks=True, autorange=False, zorder=None,
-            hold=None, data=None):
+            whiskerprops=None, manage_xticks=True, hold=None, data=None):
     ax = gca()
     # allow callers to override the hold state by passing hold=True|False
     washold = ax.ishold()
@@ -2623,8 +2607,7 @@ def boxplot(x, notch=None, sym=None, vert=None, whis=None, positions=None,
                          flierprops=flierprops, medianprops=medianprops,
                          meanprops=meanprops, capprops=capprops,
                          whiskerprops=whiskerprops,
-                         manage_xticks=manage_xticks, autorange=autorange,
-                         zorder=zorder, data=data)
+                         manage_xticks=manage_xticks, data=data)
     finally:
         ax.hold(washold)
 
@@ -3152,7 +3135,7 @@ def quiverkey(*args, **kw):
 # This function was autogenerated by boilerplate.py.  Do not edit as
 # changes will be lost
 @_autogen_docstring(Axes.scatter)
-def scatter(x, y, s=None, c=None, marker=None, cmap=None, norm=None, vmin=None,
+def scatter(x, y, s=20, c=None, marker='o', cmap=None, norm=None, vmin=None,
             vmax=None, alpha=None, linewidths=None, verts=None, edgecolors=None,
             hold=None, data=None, **kwargs):
     ax = gca()
@@ -3285,7 +3268,7 @@ def step(x, y, *args, **kwargs):
 @_autogen_docstring(Axes.streamplot)
 def streamplot(x, y, u, v, density=1, linewidth=None, color=None, cmap=None,
                norm=None, arrowsize=1, arrowstyle='-|>', minlength=0.1,
-               transform=None, zorder=None, start_points=None, maxlength=4.0,
+               transform=None, zorder=2, start_points=None, maxlength=4.0,
                integration_direction='both', hold=None, data=None):
     ax = gca()
     # allow callers to override the hold state by passing hold=True|False

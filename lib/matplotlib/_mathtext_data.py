@@ -4,7 +4,7 @@ font data tables for truetype and afm computer modern fonts
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
+from matplotlib.externals import six
 
 latex_to_bakoma = {
     '\\__sqrt__'                 : ('cmex10', 0x70),
@@ -348,6 +348,7 @@ latex_to_standard = {
     r'\Rightarrow'               : ('psyr', 222),
     r'\Downarrow'                : ('psyr', 223),
     r'\Diamond'                  : ('psyr', 224),
+    r'\langle'                   : ('psyr', 225),
     r'\Sigma'                    : ('psyr', 229),
     r'\sum'                      : ('psyr', 229),
     r'\forall'                   : ('psyr',  34),
@@ -2110,6 +2111,7 @@ tex2uni = {
     'pitchfork'                : 8916,
     'blacktriangleleft'        : 9664,
     'nprec'                    : 8832,
+    'vdots'                    : 8942,
     'curvearrowright'          : 8631,
     'barwedge'                 : 8892,
     'multimap'                 : 8888,
@@ -2136,6 +2138,7 @@ tex2uni = {
     'Im'                       : 8465,
     'curvearrowleft'           : 8630,
     'wedgeq'                   : 8793,
+    'fallingdotseq'            : 8786,
     'curlyeqprec'              : 8926,
     'questeq'                  : 8799,
     'less'                     : 60,

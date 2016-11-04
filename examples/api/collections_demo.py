@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 '''Demonstration of LineCollection, PolyCollection, and
 RegularPolyCollection with autoscaling.
 
@@ -17,7 +18,8 @@ units.  This behavior is available only for the LineCollection.
 '''
 
 import matplotlib.pyplot as plt
-from matplotlib import collections, colors, transforms
+from matplotlib import collections, transforms
+from matplotlib.colors import colorConverter
 import numpy as np
 
 nverts = 50
@@ -31,21 +33,16 @@ yy = r * np.cos(theta)
 spiral = list(zip(xx, yy))
 
 # Make some offsets
-# Fixing random state for reproducibility
-rs = np.random.RandomState(19680801)
-
-
+rs = np.random.RandomState([12345678])
 xo = rs.randn(npts)
 yo = rs.randn(npts)
 xyo = list(zip(xo, yo))
 
 # Make a list of colors cycling through the default series.
-colors = [colors.to_rgba(c)
+colors = [colorConverter.to_rgba(c)
           for c in plt.rcParams['axes.prop_cycle'].by_key()['color']]
 
 fig, axes = plt.subplots(2, 2)
-fig.subplots_adjust(top=0.92, left=0.07, right=0.97,
-                    hspace=0.3, wspace=0.3)
 ((ax1, ax2), (ax3, ax4)) = axes  # unpack the axes
 
 

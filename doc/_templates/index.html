@@ -57,29 +57,15 @@ function getSnippet(id, url) {
   web application servers, and six graphical user
   interface toolkits.</p>
 
-  <div class="responsive_screenshots">
-    <a a href="{{ pathto('users/screenshots') }}">
-      <div class="responsive_subfig">
-        <img align="middle", src="{{ pathto('_static/membrane_frontpage.png', 1) }}", border="0", alt="screenshots"/>
-      </div>
-      <div class="responsive_subfig">
-        <img align="middle", src="{{ pathto('_static/histogram_frontpage.png', 1) }}", border="0", alt="screenshots"/>
-      </div>
-      <div class="responsive_subfig">
-        <img align="middle", src="{{ pathto('_static/contour_frontpage.png', 1) }}", border="0", alt="screenshots"/>
-      </div>
-      <div class="responsive_subfig">
-        <img align="middle", src="{{ pathto('_static/surface3d_frontpage.png', 1) }}", border="0", alt="screenshots"/>
-      </div>
-    </a>
-  </div>
-  <span class="clear_screenshots"></span>
+  <p align="center"><a href="{{ pathto('users/screenshots') }}"><img align="middle"
+  src="{{ pathto('_static/logo_sidebar_horiz.png', 1) }}" border="0"
+  alt="screenshots"/></a></p>
 
   <p>matplotlib tries to make easy things easy and hard things possible.
   You can generate plots, histograms, power spectra, bar charts,
   errorcharts, scatterplots, etc, with just a few lines of code.
   For a sampling, see the <a href="{{ pathto('users/screenshots') }}">screenshots</a>, <a href="{{ pathto('gallery') }}">thumbnail</a> gallery,  and
-    <a href="{{ pathto('examples/index') }}">examples</a> directory</p>
+    <a href="examples/index.html">examples</a> directory</p>
 
 <p>For simple plotting the <tt>pyplot</tt> interface provides a
   MATLAB-like interface, particularly when combined
@@ -116,7 +102,9 @@ function getSnippet(id, url) {
 
   <h1>Installation</h1>
 
-  Visit the <a href="{{ pathto('users/installing') }}">matplotlib installation instructions</a>.
+  Visit the
+  <a href="http://matplotlib.org/users/installing.html">matplotlib
+  installation instructions.</a>.
 
   <h1>Documentation</h1>
 
@@ -128,8 +116,8 @@ function getSnippet(id, url) {
   </script>
 
   <p>Trying to learn how to do a particular kind of plot?  Check out
-  the <a href="{{ pathto('gallery') }}">gallery</a>, <a href="{{ pathto('examples/index') }}">examples</a>,
-  or the <a href="{{ pathto('api/pyplot_summary') }}">list of plotting
+  the <a href="gallery.html">gallery</a>, <a href="examples/index.html">examples</a>,
+  or the <a href="api/pyplot_summary.html">list of plotting
   commands</a>.</p>
 
   <h4>Other learning resources</h4>
@@ -178,12 +166,9 @@ changes</a> file.</p>
 
 <h1>Third party packages</h1>
 
-<p>A large number of <a href="{{ pathto('thirdpartypackages/index') }}">third party packages</a>
-    extend and build on Matplotlib functionality, including several higher-level plotting interfaces
-    <a href="https://seaborn.github.io/">seaborn</a>,
-    <a href="http://holoviews.org">holoviews</a>,
-    <a href="http://ggplot.yhathq.com">ggplot</a>, and
-    two projection and mapping toolkits
+<p>A large number of third party <a href="{{ pathto('mpl_toolkits/index') }}">packages</a>
+    extend and build on Matplotlib functionality,
+    including a choice of two projection and mapping toolkits
     <a href="http://matplotlib.org/basemap">basemap</a> and
     <a href="http://scitools.org.uk/cartopy/docs/latest">cartopy</a>.
 </p>
@@ -201,11 +186,10 @@ changes</a> file.</p>
 </p>
 
   <h1>Open source</h1>
-  <img src="_static/numfocus_badge.png" alt="A Fiscally Sponsored Project of NUMFocus"
-       style="float:right; margin-left:20px" />
+
 <p>
 Please
-consider <a href="https://www.flipcause.com/widget/MjI1OA==">donating
+consider <a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=X9T4KLZT2794S">donating
 to the matplotlib project</a> through the Numfocus organization or to
 the <a href="http://numfocus.org/johnhunter/">John Hunter Technology Fellowship</a>.
 </p>

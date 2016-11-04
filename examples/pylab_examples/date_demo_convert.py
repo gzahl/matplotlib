@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import datetime
 import matplotlib.pyplot as plt
 from matplotlib.dates import DayLocator, HourLocator, DateFormatter, drange

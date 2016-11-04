@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Automatic tick selection for major and minor ticks.
 

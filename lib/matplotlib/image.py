@@ -6,9 +6,9 @@ operations.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
-from six.moves.urllib.parse import urlparse
-from six.moves.urllib.request import urlopen
+from matplotlib.externals import six
+from matplotlib.externals.six.moves.urllib.parse import urlparse
+from matplotlib.externals.six.moves.urllib.request import urlopen
 from io import BytesIO
 
 from math import ceil
@@ -354,44 +354,21 @@ class _ImageBase(martist.Artist, cm.ScalarMappable):
             out_height = int(out_height_base)
 
         if not unsampled:
-            created_rgba_mask = False
-
-            if A.ndim not in (2, 3):
-                raise ValueError("Invalid dimensions, got %s" % (A.shape,))
-
             if A.ndim == 2:
                 A = self.norm(A)
                 if A.dtype.kind == 'f':
-                    # If the image is greyscale, convert to RGBA and
-                    # use the extra channels for resizing the over,
-                    # under, and bad pixels.  This is needed because
-                    # Agg's resampler is very aggressive about
-                    # clipping to [0, 1] and we use out-of-bounds
-                    # values to carry the over/under/bad information
-                    rgba = np.empty((A.shape[0], A.shape[1], 4), dtype=A.dtype)
-                    rgba[..., 0] = A  # normalized data
-                    rgba[..., 1] = A < 0  # under data
-                    rgba[..., 2] = A > 1  # over data
-                    rgba[..., 3] = ~A.mask  # bad data
-                    A = rgba
-                    output = np.zeros((out_height, out_width, 4),
-                                      dtype=A.dtype)
-                    alpha = 1.0
-                    created_rgba_mask = True
-                else:
-                    # colormap norms that output integers (ex NoNorm
-                    # and BoundaryNorm) to RGBA space before
-                    # interpolating.  This is needed due to the
-                    # Agg resampler only working on floats in the
-                    # range [0, 1] and because interpolating indexes
-                    # into an arbitrary LUT may be problematic.
-                    #
-                    # This falls back to interpolating in RGBA space which
-                    # can produce it's own artifacts of colors not in the map
-                    # showing up in the final image.
-                    A = self.cmap(A, alpha=self.get_alpha(), bytes=True)
+                    # For floating-point greyscale images, we treat negative
+                    # numbers as transparent.
 
-            if not created_rgba_mask:
+                    # TODO: Use np.full when we support Numpy 1.9 as a
+                    # minimum
+                    output = np.empty((out_height, out_width), dtype=A.dtype)
+                    output[...] = -100.0
+                else:
+                    output = np.zeros((out_height, out_width), dtype=A.dtype)
+
+                alpha = 1.0
+            elif A.ndim == 3:
                 # Always convert to RGBA, even if only RGB input
                 if A.shape[2] == 3:
                     A = _rgb_to_rgba(A)
@@ -403,27 +380,18 @@ class _ImageBase(martist.Artist, cm.ScalarMappable):
                 alpha = self.get_alpha()
                 if alpha is None:
                     alpha = 1.0
+            else:
+                raise ValueError("Invalid dimensions, got %s" % (A.shape,))
 
             _image.resample(
                 A, output, t, _interpd_[self.get_interpolation()],
                 self.get_resample(), alpha,
                 self.get_filternorm() or 0.0, self.get_filterrad() or 0.0)
 
-            if created_rgba_mask:
-                # Convert back to a masked greyscale array so
-                # colormapping works correctly
-                hid_output = output
-                output = np.ma.masked_array(
-                    hid_output[..., 0], hid_output[..., 3] < 0.5)
-                # relabel under data
-                output[hid_output[..., 1] > .5] = -1
-                # relabel over data
-                output[hid_output[..., 2] > .5] = 2
-
             output = self.to_rgba(output, bytes=True, norm=False)
 
-            # Apply alpha *after* if the input was greyscale without a mask
-            if A.ndim == 2 or created_rgba_mask:
+            # Apply alpha *after* if the input was greyscale
+            if A.ndim == 2:
                 alpha = self.get_alpha()
                 if alpha is not None and alpha != 1.0:
                     alpha_channel = output[:, :, 3]
@@ -537,10 +505,10 @@ class _ImageBase(martist.Artist, cm.ScalarMappable):
         if hasattr(A, 'getpixel'):
             self._A = pil_to_array(A)
         else:
-            self._A = cbook.safe_masked_invalid(A, copy=True)
+            self._A = cbook.safe_masked_invalid(A)
 
         if (self._A.dtype != np.uint8 and
-                not np.can_cast(self._A.dtype, float)):
+                not np.can_cast(self._A.dtype, np.float)):
             raise TypeError("Image data can not convert to float")
 
         if (self._A.ndim not in (2, 3) or
@@ -839,16 +807,16 @@ class NonUniformImage(AxesImage):
         """
         Set the grid for the pixel centers, and the pixel values.
 
-          *x* and *y* are monotonic 1-D ndarrays of lengths N and M,
-             respectively, specifying pixel centers
+          *x* and *y* are 1-D ndarrays of lengths N and M, respectively,
+             specifying pixel centers
 
           *A* is an (M,N) ndarray or masked array of values to be
             colormapped, or a (M,N,3) RGB array, or a (M,N,4) RGBA
             array.
         """
-        x = np.array(x, np.float32)
-        y = np.array(y, np.float32)
-        A = cbook.safe_masked_invalid(A, copy=True)
+        x = np.asarray(x, np.float32)
+        y = np.asarray(y, np.float32)
+        A = cbook.safe_masked_invalid(A)
         if len(x.shape) != 1 or len(y.shape) != 1\
            or A.shape[0:2] != (y.shape[0], x.shape[0]):
             raise TypeError("Axes don't match array shape")
@@ -923,8 +891,7 @@ class PcolorImage(AxesImage):
         """
         super(PcolorImage, self).__init__(ax, norm=norm, cmap=cmap)
         self.update(kwargs)
-        if A is not None:
-            self.set_data(x, y, A)
+        self.set_data(x, y, A)
 
     def make_image(self, renderer, magnification=1.0, unsampled=False):
         if self._A is None:
@@ -932,7 +899,7 @@ class PcolorImage(AxesImage):
         if unsampled:
             raise ValueError('unsampled not supported on PColorImage')
         fc = self.axes.patch.get_facecolor()
-        bg = mcolors.to_rgba(fc, 0)
+        bg = mcolors.colorConverter.to_rgba(fc, 0)
         bg = (np.array(bg)*255).astype(np.uint8)
         l, b, r, t = self.axes.bbox.extents
         width = (np.round(r) + 0.5) - (np.round(l) - 0.5)
@@ -959,28 +926,15 @@ class PcolorImage(AxesImage):
         return False
 
     def set_data(self, x, y, A):
-        """
-        Set the grid for the rectangle boundaries, and the data values.
-
-          *x* and *y* are monotonic 1-D ndarrays of lengths N+1 and M+1,
-             respectively, specifying rectangle boundaries.  If None,
-             they will be created as uniform arrays from 0 through N
-             and 0 through M, respectively.
-
-          *A* is an (M,N) ndarray or masked array of values to be
-            colormapped, or a (M,N,3) RGB array, or a (M,N,4) RGBA
-            array.
-
-        """
-        A = cbook.safe_masked_invalid(A, copy=True)
+        A = cbook.safe_masked_invalid(A)
         if x is None:
             x = np.arange(0, A.shape[1]+1, dtype=np.float64)
         else:
-            x = np.array(x, np.float64).ravel()
+            x = np.asarray(x, np.float64).ravel()
         if y is None:
             y = np.arange(0, A.shape[0]+1, dtype=np.float64)
         else:
-            y = np.array(y, np.float64).ravel()
+            y = np.asarray(y, np.float64).ravel()
 
         if A.shape[:2] != (y.size-1, x.size-1):
             raise ValueError(
@@ -998,15 +952,6 @@ class PcolorImage(AxesImage):
                     self.is_grayscale = True
             else:
                 raise ValueError("3D arrays must have RGB or RGBA as last dim")
-
-        # For efficient cursor readout, ensure x and y are increasing.
-        if x[-1] < x[0]:
-            x = x[::-1]
-            A = A[:, ::-1]
-        if y[-1] < y[0]:
-            y = y[::-1]
-            A = A[::-1]
-
         self._A = A
         self._Ax = x
         self._Ay = y
@@ -1015,19 +960,6 @@ class PcolorImage(AxesImage):
 
     def set_array(self, *args):
         raise NotImplementedError('Method not supported')
-
-    def get_cursor_data(self, event):
-        """Get the cursor data for a given event"""
-        x, y = event.xdata, event.ydata
-        if (x < self._Ax[0] or x > self._Ax[-1] or
-                y < self._Ay[0] or y > self._Ay[-1]):
-            return None
-        j = np.searchsorted(self._Ax, x) - 1
-        i = np.searchsorted(self._Ay, y) - 1
-        try:
-            return self._A[i, j]
-        except:
-            return None
 
 
 class FigureImage(_ImageBase):
@@ -1075,12 +1007,6 @@ class FigureImage(_ImageBase):
         return self._make_image(
             self._A, bbox, bbox, clip, magnification=magnification,
             unsampled=unsampled, round_to_pixel_border=False)
-
-    def set_data(self, A):
-        """Set the image array."""
-        cm.ScalarMappable.set_array(self,
-                                    cbook.safe_masked_invalid(A, copy=True))
-        self.stale = True
 
 
 class BboxImage(_ImageBase):

@@ -4,10 +4,6 @@
 Using matplotlib in a python shell
 **********************************
 
-.. warning::
-
-   This page is significantly out of date
-
 By default, matplotlib defers drawing until the end of the script
 because drawing can be an expensive operation, and you may not want
 to update the plot every time a single property is changed, only once
@@ -73,7 +69,7 @@ run so you can continue tweaking the figure manually.
 There has been a lot of recent work to embed ipython, with pylab
 support, into various GUI applications, so check on the ipython
 mailing `list
-<http://mail.scipy.org/mailman/listinfo/ipython-user>`_ for the
+<http://projects.scipy.org/mailman/listinfo/ipython-user>`_ for the
 latest status.
 
 .. _other-shells:
@@ -158,3 +154,6 @@ the performance hit::
     >>> close()
     >>> ion()      # turn updating back on
     >>> plot(rand(20), mfc='g', mec='r', ms=40, mew=4, ls='--', lw=3)
+
+
+

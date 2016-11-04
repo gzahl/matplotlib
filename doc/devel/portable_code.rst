@@ -1,9 +1,5 @@
-
-.. _portable_code:
-
-=====================================================
-Developer's tips for writing code for Python 2 and 3
-=====================================================
+Writing code for Python 2 and 3
+-------------------------------
 
 As of matplotlib 1.4, the `six <http://pythonhosted.org/six/>`_
 library is used to support Python 2 and 3 from a single code base.

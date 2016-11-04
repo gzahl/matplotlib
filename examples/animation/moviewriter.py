@@ -1,14 +1,7 @@
-"""
-===========
-MovieWriter
-===========
-
-This example uses a MovieWriter directly to grab individual frames and write
-them to a file. This avoids any event loop integration, but has the advantage
-of working with even the Agg backend. This is not recommended for use in an
-interactive setting.
-
-"""
+# This example uses a MovieWriter directly to grab individual frames and
+# write them to a file. This avoids any event loop integration, but has
+# the advantage of working with even the Agg backend. This is not recommended
+# for use in an interactive setting.
 # -*- noplot -*-
 
 import numpy as np
@@ -16,10 +9,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.animation as manimation
-
-# Fixing random state for reproducibility
-np.random.seed(19680801)
-
 
 FFMpegWriter = manimation.writers['ffmpeg']
 metadata = dict(title='Movie Test', artist='Matplotlib',

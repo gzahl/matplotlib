@@ -7,7 +7,9 @@ Working with text
 
     text_intro.rst
     text_props.rst
-    annotations.rst
     mathtext.rst
-    usetex.rst
     pgf.rst
+    usetex.rst
+    annotations_intro.rst
+
+

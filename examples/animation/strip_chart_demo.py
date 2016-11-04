@@ -1,9 +1,6 @@
 """
-============
-Oscilloscope
-============
-
-Emulates an oscilloscope.
+Emulate an oscilloscope.  Requires the animation API introduced in
+matplotlib 1.0 SVN.
 """
 import numpy as np
 from matplotlib.lines import Line2D
@@ -46,10 +43,6 @@ def emitter(p=0.03):
             yield 0.
         else:
             yield np.random.rand(1)
-
-# Fixing random state for reproducibility
-np.random.seed(19680801)
-
 
 fig, ax = plt.subplots()
 scope = Scope(ax)

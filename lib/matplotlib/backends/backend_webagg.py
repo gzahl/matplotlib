@@ -13,17 +13,16 @@ from __future__ import (absolute_import, division, print_function,
 # - `backend_webagg.py` contains a concrete implementation of a basic
 #   application, implemented with tornado.
 
-import six
+from matplotlib.externals import six
 
+import datetime
 import errno
 import json
 import os
 import random
 import sys
-import signal
 import socket
 import threading
-from contextlib import contextmanager
 
 try:
     import tornado
@@ -263,7 +262,7 @@ class WebAggApplication(tornado.web.Application):
                 (url_prefix + r'/?', self.AllFiguresPage,
                  {'url_prefix': url_prefix}),
 
-                (url_prefix + r'/js/mpl.js', self.MplJs),
+                (url_prefix + r'/mpl.js', self.MplJs),
 
                 # Sends images and events to the browser, and receives
                 # events from the browser
@@ -324,6 +323,9 @@ class WebAggApplication(tornado.web.Application):
         if cls.started:
             return
 
+        # Set the flag to True *before* blocking on IOLoop.instance().start()
+        cls.started = True
+
         """
         IOLoop.running() was removed as of Tornado 2.4; see for example
         https://groups.google.com/forum/#!topic/python-tornado/QLMzkpQBGOY
@@ -331,31 +333,15 @@ class WebAggApplication(tornado.web.Application):
         launched. We may end up with two concurrently running loops in that
         unlucky case with all the expected consequences.
         """
-        ioloop = tornado.ioloop.IOLoop.instance()
-
-        def shutdown():
-            ioloop.stop()
-            print("Server is stopped")
-            sys.stdout.flush()
-            cls.started = False
-
-        @contextmanager
-        def catch_sigint():
-            old_handler = signal.signal(
-                signal.SIGINT,
-                lambda sig, frame: ioloop.add_callback_from_signal(shutdown))
-            try:
-                yield
-            finally:
-                signal.signal(signal.SIGINT, old_handler)
-
-        # Set the flag to True *before* blocking on ioloop.start()
-        cls.started = True
-
         print("Press Ctrl+C to stop WebAgg server")
         sys.stdout.flush()
-        with catch_sigint():
-            ioloop.start()
+        try:
+            tornado.ioloop.IOLoop.instance().start()
+        except KeyboardInterrupt:
+            print("Server is stopped")
+            sys.stdout.flush()
+        finally:
+            cls.started = False
 
 
 def ipython_inline_display(figure):

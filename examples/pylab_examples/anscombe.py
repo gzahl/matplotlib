@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from __future__ import print_function
 """
 Edward Tufte uses this example from Anscombe to show 4 datasets of x

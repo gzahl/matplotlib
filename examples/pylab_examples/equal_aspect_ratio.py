@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Example: simple line plot.
 Show how to make a plot that has equal aspect ratio

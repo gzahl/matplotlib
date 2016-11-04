@@ -1,38 +1,34 @@
 """
 A collection of functions for collecting, analyzing and plotting
-financial data.
+financial data.   User contributions welcome!
 
-This module is deprecated in 2.0 and has been moved to a mpl_toolkit called
-`finance`.
+This module is deprecated in 1.4 and will be moved to `mpl_toolkits`
+or it's own project in the future.
+
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
-from six.moves import xrange, zip
+from matplotlib.externals import six
+from matplotlib.externals.six.moves import xrange, zip
 
 import contextlib
 import os
 import warnings
-from six.moves.urllib.request import urlopen
+from matplotlib.externals.six.moves.urllib.request import urlopen
 
 import datetime
 
 import numpy as np
 
-from matplotlib import colors as mcolors, verbose, get_cachedir
+from matplotlib import verbose, get_cachedir
 from matplotlib.dates import date2num
-from matplotlib.cbook import iterable, mkdirs, warn_deprecated
+from matplotlib.cbook import iterable, mkdirs
 from matplotlib.collections import LineCollection, PolyCollection
+from matplotlib.colors import colorConverter
 from matplotlib.lines import Line2D, TICKLEFT, TICKRIGHT
 from matplotlib.patches import Rectangle
 from matplotlib.transforms import Affine2D
-
-warn_deprecated(
-    since=2.0,
-    message=("The finance module has been deprecated in mpl 2.0 and will "
-             "be removed in mpl 2.2. Please use the matplotlib toolkit "
-             "finance instead."))
 
 
 if six.PY3:
@@ -268,7 +264,7 @@ def _parse_yahoo_historical(fh, adjusted=True, asobject=False,
 
     if not asobject:
         # 2-D sequence; formerly list of tuples, now ndarray
-        ret = np.zeros((len(d), 6), dtype=float)
+        ret = np.zeros((len(d), 6), dtype=np.float)
         ret[:, 0] = d['d']
         if ochl:
             ret[:, 1] = d['open']
@@ -973,9 +969,13 @@ def plot_day_summary2_ohlc(ax, opens, highs, lows, closes, ticksize=4,
 
     tickTransform = Affine2D().scale(scale, 0.0)
 
-    colorup = mcolors.to_rgba(colorup)
-    colordown = mcolors.to_rgba(colordown)
-    colord = {True: colorup, False: colordown}
+    r, g, b = colorConverter.to_rgb(colorup)
+    colorup = r, g, b, 1
+    r, g, b = colorConverter.to_rgb(colordown)
+    colordown = r, g, b, 1
+    colord = {True: colorup,
+              False: colordown,
+              }
     colors = [colord[open < close] for open, close in
               zip(opens, closes) if open != -1 and close != -1]
 
@@ -1056,7 +1056,7 @@ def candlestick2_ochl(ax, opens, closes, highs, lows,  width=4,
         (lineCollection, barCollection)
     """
 
-    candlestick2_ohlc(ax, opens, highs, lows, closes, width=width,
+    candlestick2_ohlc(ax, opens, highs, closes, lows, width=width,
                      colorup=colorup, colordown=colordown,
                      alpha=alpha)
 
@@ -1113,9 +1113,13 @@ def candlestick2_ohlc(ax, opens, highs, lows, closes, width=4,
                      for i, low, high in zip(xrange(len(lows)), lows, highs)
                      if low != -1]
 
-    colorup = mcolors.to_rgba(colorup, alpha)
-    colordown = mcolors.to_rgba(colordown, alpha)
-    colord = {True: colorup, False: colordown}
+    r, g, b = colorConverter.to_rgb(colorup)
+    colorup = r, g, b, alpha
+    r, g, b = colorConverter.to_rgb(colordown)
+    colordown = r, g, b, alpha
+    colord = {True: colorup,
+              False: colordown,
+              }
     colors = [colord[open < close]
               for open, close in zip(opens, closes)
               if open != -1 and close != -1]
@@ -1144,8 +1148,8 @@ def candlestick2_ohlc(ax, opens, highs, lows, closes, width=4,
     ax.autoscale_view()
 
     # add these last
-    ax.add_collection(rangeCollection)
     ax.add_collection(barCollection)
+    ax.add_collection(rangeCollection)
     return rangeCollection, barCollection
 
 
@@ -1182,9 +1186,13 @@ def volume_overlay(ax, opens, closes, volumes,
 
     """
 
-    colorup = mcolors.to_rgba(colorup, alpha)
-    colordown = mcolors.to_rgba(colordown, alpha)
-    colord = {True: colorup, False: colordown}
+    r, g, b = colorConverter.to_rgb(colorup)
+    colorup = r, g, b, alpha
+    r, g, b = colorConverter.to_rgb(colordown)
+    colordown = r, g, b, alpha
+    colord = {True: colorup,
+              False: colordown,
+              }
     colors = [colord[open < close]
               for open, close in zip(opens, closes)
               if open != -1 and close != -1]
@@ -1280,9 +1288,13 @@ def volume_overlay3(ax, quotes,
 
     """
 
-    colorup = mcolors.to_rgba(colorup, alpha)
-    colordown = mcolors.to_rgba(colordown, alpha)
-    colord = {True: colorup, False: colordown}
+    r, g, b = colorConverter.to_rgb(colorup)
+    colorup = r, g, b, alpha
+    r, g, b = colorConverter.to_rgb(colordown)
+    colordown = r, g, b, alpha
+    colord = {True: colorup,
+              False: colordown,
+              }
 
     dates, opens, highs, lows, closes, volumes = list(zip(*quotes))
     colors = [colord[close1 >= close0]
@@ -1357,8 +1369,8 @@ def index_bar(ax, vals,
 
     """
 
-    facecolors = (mcolors.to_rgba(facecolor, alpha),)
-    edgecolors = (mcolors.to_rgba(edgecolor, alpha),)
+    facecolors = (colorConverter.to_rgba(facecolor, alpha),)
+    edgecolors = (colorConverter.to_rgba(edgecolor, alpha),)
 
     right = width / 2.0
     left = -width / 2.0

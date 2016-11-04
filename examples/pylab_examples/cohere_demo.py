@@ -1,12 +1,9 @@
+#!/usr/bin/env python
 """
 Compute the coherence of two signals
 """
 import numpy as np
 import matplotlib.pyplot as plt
-
-# Fixing random state for reproducibility
-np.random.seed(19680801)
-
 
 # make a little extra space between the subplots
 plt.subplots_adjust(wspace=0.5)

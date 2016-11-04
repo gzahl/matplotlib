@@ -1,6 +1,6 @@
 from __future__ import print_function
 import numpy
-import matplotlib.pyplot as plt
+from matplotlib.pyplot import figure, show
 
 
 class IndexTracker(object):
@@ -10,7 +10,7 @@ class IndexTracker(object):
 
         self.X = X
         rows, cols, self.slices = X.shape
-        self.ind = self.slices//2
+        self.ind = self.slices/2
 
         self.im = ax.imshow(self.X[:, :, self.ind])
         self.update()
@@ -21,6 +21,7 @@ class IndexTracker(object):
             self.ind = numpy.clip(self.ind + 1, 0, self.slices - 1)
         else:
             self.ind = numpy.clip(self.ind - 1, 0, self.slices - 1)
+
         self.update()
 
     def update(self):
@@ -29,7 +30,8 @@ class IndexTracker(object):
         self.im.axes.figure.canvas.draw()
 
 
-fig, ax = plt.subplots(1, 1)
+fig = figure()
+ax = fig.add_subplot(111)
 
 X = numpy.random.rand(20, 20, 40)
 
@@ -37,4 +39,4 @@ tracker = IndexTracker(ax, X)
 
 
 fig.canvas.mpl_connect('scroll_event', tracker.onscroll)
-plt.show()
+show()

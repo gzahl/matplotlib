@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from __future__ import print_function
 
 # For detailed comments on animation and the techniques used here, see

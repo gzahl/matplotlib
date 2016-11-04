@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 '''
 Make a set of images with a single colormap, norm, and colorbar.
 

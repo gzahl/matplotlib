@@ -1,14 +1,15 @@
+#!/usr/bin/env python
 # -*- noplot -*-
 """
 Some simple functions to generate colours.
 """
 import numpy as np
-from matplotlib import colors as mcolors
+from matplotlib.colors import colorConverter
 
 
 def pastel(colour, weight=2.4):
     """ Convert colour into a nice pastel shade"""
-    rgb = np.asarray(mcolors.to_rgba(colour)[:3])
+    rgb = np.asarray(colorConverter.to_rgb(colour))
     # scale colour
     maxc = max(rgb)
     if maxc < 1.0 and maxc > 0:

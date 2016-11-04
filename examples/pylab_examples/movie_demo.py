@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- noplot -*-
 
 from __future__ import print_function
@@ -5,10 +6,6 @@ from __future__ import print_function
 import os
 import matplotlib.pyplot as plt
 import numpy as np
-
-# Fixing random state for reproducibility
-np.random.seed(19680801)
-
 
 files = []
 
@@ -21,7 +18,7 @@ for i in range(50):  # 50 frames
     plt.savefig(fname)
     files.append(fname)
 
-print('Making movie animation.mpg - this may take a while')
+print('Making movie animation.mpg - this make take a while')
 os.system("mencoder 'mf://_tmp*.png' -mf type=png:fps=10 -ovc lavc -lavcopts vcodec=wmv2 -oac copy -o animation.mpg")
 #os.system("convert _tmp*.png animation.mng")
 

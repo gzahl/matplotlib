@@ -1,3 +1,4 @@
+#!/usr/bin/python
 # axes3d.py, original mplot3d version by John Porter
 # Created: 23 Sep 2005
 # Parts fixed by Reinier Heeres <reinier@heeres.eu>
@@ -12,8 +13,8 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import math
 
-import six
-from six.moves import map, xrange, zip, reduce
+from matplotlib.externals import six
+from matplotlib.externals.six.moves import map, xrange, zip, reduce
 
 import warnings
 from operator import itemgetter
@@ -28,8 +29,7 @@ from matplotlib import docstring
 import matplotlib.scale as mscale
 from matplotlib.tri.triangulation import Triangulation
 import numpy as np
-from matplotlib import colors as mcolors
-from matplotlib.colors import Normalize, LightSource
+from matplotlib.colors import Normalize, colorConverter, LightSource
 
 from . import art3d
 from . import proj3d
@@ -745,21 +745,19 @@ class Axes3D(Axes):
         return self.xy_viewLim.intervalx
     get_xlim3d.__doc__ = maxes.Axes.get_xlim.__doc__
     get_xlim = get_xlim3d
-    if get_xlim.__doc__ is not None:
-        get_xlim.__doc__ += """
-            .. versionchanged :: 1.1.0
-                This function now correctly refers to the 3D x-limits
-            """
+    get_xlim.__doc__ += """
+        .. versionchanged :: 1.1.0
+            This function now correctly refers to the 3D x-limits
+        """
 
     def get_ylim3d(self):
         return self.xy_viewLim.intervaly
     get_ylim3d.__doc__ = maxes.Axes.get_ylim.__doc__
     get_ylim = get_ylim3d
-    if get_ylim.__doc__ is not None:
-        get_ylim.__doc__ += """
-            .. versionchanged :: 1.1.0
-                This function now correctly refers to the 3D y-limits.
-            """
+    get_ylim.__doc__ += """
+        .. versionchanged :: 1.1.0
+            This function now correctly refers to the 3D y-limits.
+        """
 
     def get_zlim3d(self):
         '''Get 3D z limits.'''
@@ -781,28 +779,30 @@ class Axes3D(Axes):
         self.xaxis._set_scale(value, **kwargs)
         self.autoscale_view(scaley=False, scalez=False)
         self._update_transScale()
-    if maxes.Axes.set_xscale.__doc__ is not None:
-        set_xscale.__doc__ = maxes.Axes.set_xscale.__doc__ + """
+    set_xscale.__doc__ = maxes.Axes.set_xscale.__doc__ + """
 
-            .. versionadded :: 1.1.0
-                This function was added, but not tested. Please report any bugs.
-            """
+        .. versionadded :: 1.1.0
+            This function was added, but not tested. Please report any bugs.
+        """
 
     def set_yscale(self, value, **kwargs) :
         self.yaxis._set_scale(value, **kwargs)
         self.autoscale_view(scalex=False, scalez=False)
         self._update_transScale()
         self.stale = True
-    if maxes.Axes.set_yscale.__doc__ is not None:
-        set_yscale.__doc__ = maxes.Axes.set_yscale.__doc__ + """
+    set_yscale.__doc__ = maxes.Axes.set_yscale.__doc__ + """
 
-            .. versionadded :: 1.1.0
-                This function was added, but not tested. Please report any bugs.
-            """
+        .. versionadded :: 1.1.0
+            This function was added, but not tested. Please report any bugs.
+        """
 
     @docstring.dedent_interpd
     def set_zscale(self, value, **kwargs) :
         """
+        call signature::
+
+          set_zscale(value)
+
         Set the scaling of the z-axis: %(scale)s
 
         ACCEPTS: [%(scale)s]
@@ -1593,10 +1593,7 @@ class Axes3D(Axes):
         if 'facecolors' in kwargs:
             fcolors = kwargs.pop('facecolors')
         else:
-            color = kwargs.pop('color', None)
-            if color is None:
-                color = self._get_lines.get_next_color()
-            color = np.array(mcolors.to_rgba(color))
+            color = np.array(colorConverter.to_rgba(kwargs.pop('color', 'b')))
             fcolors = None
 
         cmap = kwargs.get('cmap', None)
@@ -1714,7 +1711,7 @@ class Axes3D(Axes):
         if len(shade[mask]) > 0:
             norm = Normalize(min(shade[mask]), max(shade[mask]))
             shade[~mask] = min(shade[mask])
-            color = mcolors.to_rgba_array(color)
+            color = colorConverter.to_rgba_array(color)
             # shape of color should be (M, 4) (where M is number of faces)
             # shape of shade should be (M,)
             # colors should have final shape of (M, 4)
@@ -1865,10 +1862,7 @@ class Axes3D(Axes):
         had_data = self.has_data()
 
         # TODO: Support custom face colours
-        color = kwargs.pop('color', None)
-        if color is None:
-            color = self._get_lines.get_next_color()
-        color = np.array(mcolors.to_rgba(color))
+        color = np.array(colorConverter.to_rgba(kwargs.pop('color', 'b')))
 
         cmap = kwargs.get('cmap', None)
         norm = kwargs.pop('norm', None)
@@ -2217,7 +2211,7 @@ class Axes3D(Axes):
 
         Axes.add_collection(self, col)
 
-    def scatter(self, xs, ys, zs=0, zdir='z', s=20, c=None, depthshade=True,
+    def scatter(self, xs, ys, zs=0, zdir='z', s=20, c='b', depthshade=True,
                 *args, **kwargs):
         '''
         Create a scatter plot.
@@ -2241,9 +2235,7 @@ class Axes3D(Axes):
                       that *c* should not be a single numeric RGB or RGBA
                       sequence because that is indistinguishable from an array
                       of values to be colormapped.  *c* can be a 2-D array in
-                      which the rows are RGB or RGBA, however, including the
-                      case of a single row to specify the same color for
-                      all points.
+                      which the rows are RGB or RGBA, however.
 
         *depthshade*
                       Whether or not to shade the scatter markers to give
@@ -2272,15 +2264,13 @@ class Axes3D(Axes):
 
         s = np.ma.ravel(s)  # This doesn't have to match x, y in size.
 
-        if c is not None:
-            cstr = cbook.is_string_like(c) or cbook.is_sequence_of_strings(c)
-            if not cstr:
-                c = np.asanyarray(c)
-                if c.size == xs.size:
-                    c = np.ma.ravel(c)
-            xs, ys, zs, s, c = cbook.delete_masked_points(xs, ys, zs, s, c)
-        else:
-            xs, ys, zs, s = cbook.delete_masked_points(xs, ys, zs, s)
+        cstr = cbook.is_string_like(c) or cbook.is_sequence_of_strings(c)
+        if not cstr:
+            c = np.asanyarray(c)
+            if c.size == xs.size:
+                c = np.ma.ravel(c)
+
+        xs, ys, zs, s, c = cbook.delete_masked_points(xs, ys, zs, s, c)
 
         patches = Axes.scatter(self, xs, ys, s=s, c=c, *args, **kwargs)
         if not cbook.iterable(zs):
@@ -2352,7 +2342,7 @@ class Axes3D(Axes):
 
         return patches
 
-    def bar3d(self, x, y, z, dx, dy, dz, color=None,
+    def bar3d(self, x, y, z, dx, dy, dz, color='b',
               zsort='average', *args, **kwargs):
         '''
         Generate a 3D bar, or multiple bars.
@@ -2444,15 +2434,15 @@ class Axes3D(Axes):
 
         facecolors = []
         if color is None:
-            color = [self._get_patches_for_fill.get_next_color()]
-
-        if len(color) == len(x):
+            # no color specified
+            facecolors = [None] * len(x)
+        elif len(color) == len(x):
             # bar colors specified, need to expand to number of faces
             for c in color:
                 facecolors.extend([c] * 6)
         else:
             # a single color specified, or face colors specified explicitly
-            facecolors = list(mcolors.to_rgba_array(color))
+            facecolors = list(colorConverter.to_rgba_array(color))
             if len(facecolors) < len(x):
                 facecolors *= (6 * len(x))
 

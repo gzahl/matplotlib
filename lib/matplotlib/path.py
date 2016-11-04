@@ -15,12 +15,13 @@ convenient Path visualisation - the two most frequently used of these are
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
+from matplotlib.externals import six
 
 import math
 from weakref import WeakValueDictionary
 
 import numpy as np
+from numpy import ma
 
 from matplotlib import _path
 from matplotlib.cbook import simple_linear_interpolation, maxdict
@@ -130,10 +131,10 @@ class Path(object):
             Makes the path behave in an immutable way and sets the vertices
             and codes as read-only arrays.
         """
-        if isinstance(vertices, np.ma.MaskedArray):
-            vertices = vertices.astype(float).filled(np.nan)
+        if ma.isMaskedArray(vertices):
+            vertices = vertices.astype(np.float_).filled(np.nan)
         else:
-            vertices = np.asarray(vertices, float)
+            vertices = np.asarray(vertices, np.float_)
 
         if (vertices.ndim != 2) or (vertices.shape[1] != 2):
             msg = "'vertices' must be a 2D list or array with shape Nx2"
@@ -186,10 +187,10 @@ class Path(object):
         """
         internals = internals or {}
         pth = cls.__new__(cls)
-        if isinstance(verts, np.ma.MaskedArray):
-            verts = verts.astype(float).filled(np.nan)
+        if ma.isMaskedArray(verts):
+            verts = verts.astype(np.float_).filled(np.nan)
         else:
-            verts = np.asarray(verts, float)
+            verts = np.asarray(verts, np.float_)
         pth._vertices = verts
         pth._codes = codes
         pth._readonly = internals.pop('readonly', False)
@@ -297,17 +298,13 @@ class Path(object):
 
     copy = __copy__
 
-    def __deepcopy__(self, memo=None):
+    def __deepcopy__(self):
         """
         Returns a deepcopy of the `Path`.  The `Path` will not be
         readonly, even if the source `Path` is.
         """
-        try:
-            codes = self.codes.copy()
-        except AttributeError:
-            codes = None
         return self.__class__(
-            self.vertices.copy(), codes,
+            self.vertices.copy(), self.codes.copy(),
             _interpolation_steps=self._interpolation_steps)
 
     deepcopy = __deepcopy__
@@ -513,7 +510,7 @@ class Path(object):
         if transform is not None:
             transform = transform.frozen()
         result = _path.points_in_path(points, radius, self, transform)
-        return result.astype('bool')
+        return result
 
     def contains_path(self, path, transform=None):
         """
@@ -586,25 +583,17 @@ class Path(object):
             new_codes = None
         return Path(vertices, new_codes)
 
-    def to_polygons(self, transform=None, width=0, height=0, closed_only=True):
+    def to_polygons(self, transform=None, width=0, height=0):
         """
-        Convert this path to a list of polygons or polylines.  Each
-        polygon/polyline is an Nx2 array of vertices.  In other words,
-        each polygon has no ``MOVETO`` instructions or curves.  This
-        is useful for displaying in backends that do not support
-        compound paths or Bezier curves, such as GDK.
+        Convert this path to a list of polygons.  Each polygon is an
+        Nx2 array of vertices.  In other words, each polygon has no
+        ``MOVETO`` instructions or curves.  This is useful for
+        displaying in backends that do not support compound paths or
+        Bezier curves, such as GDK.
 
         If *width* and *height* are both non-zero then the lines will
         be simplified so that vertices outside of (0, 0), (width,
         height) will be clipped.
-
-        If *closed_only* is `True` (default), only closed polygons,
-        with the last point being the same as the first point, will be
-        returned.  Any unclosed polylines in the path will be
-        explicitly closed.  If *closed_only* is `False`, any unclosed
-        polygons in the path will be returned as unclosed polygons,
-        and the closed polygons will be returned explicitly closed by
-        setting the last point to the same as the first point.
         """
         if len(self.vertices) == 0:
             return []
@@ -613,22 +602,14 @@ class Path(object):
             transform = transform.frozen()
 
         if self.codes is None and (width == 0 or height == 0):
-            vertices = self.vertices
-            if closed_only:
-                if len(vertices) < 3:
-                    return []
-                elif np.any(vertices[0] != vertices[-1]):
-                    vertices = list(vertices) + [vertices[0]]
-
             if transform is None:
-                return [vertices]
+                return [self.vertices]
             else:
-                return [transform.transform(vertices)]
+                return [transform.transform(self.vertices)]
 
         # Deal with the case where there are curves and/or multiple
         # subpaths (using extension code)
-        return _path.convert_path_to_polygons(
-            self, transform, width, height, closed_only)
+        return _path.convert_path_to_polygons(self, transform, width, height)
 
     _unit_rectangle = None
 
@@ -704,7 +685,7 @@ class Path(object):
             codes[-1] = cls.CLOSEPOLY
             path = cls(verts, codes, readonly=True)
             if numVertices <= 16:
-                cls._unit_regular_stars[(numVertices, innerCircle)] = path
+                cls._unit_regular_polygons[(numVertices, innerCircle)] = path
         return path
 
     @classmethod
@@ -795,7 +776,7 @@ class Path(object):
                              [0.0, -1.0],
 
                              [0.0, -1.0]],
-                            dtype=float)
+                            dtype=np.float_)
 
         codes = [cls.CURVE4] * 26
         codes[0] = cls.MOVETO
@@ -841,7 +822,7 @@ class Path(object):
 
                  [0.0, -1.0]],
 
-                float)
+                np.float_)
 
             codes = cls.CURVE4 * np.ones(14)
             codes[0] = cls.MOVETO
@@ -901,7 +882,7 @@ class Path(object):
 
         if is_wedge:
             length = n * 3 + 4
-            vertices = np.zeros((length, 2), float)
+            vertices = np.zeros((length, 2), np.float_)
             codes = cls.CURVE4 * np.ones((length, ), cls.code_type)
             vertices[1] = [xA[0], yA[0]]
             codes[0:2] = [cls.MOVETO, cls.LINETO]
@@ -910,7 +891,7 @@ class Path(object):
             end = length - 2
         else:
             length = n * 3 + 1
-            vertices = np.empty((length, 2), float)
+            vertices = np.empty((length, 2), np.float_)
             codes = cls.CURVE4 * np.ones((length, ), cls.code_type)
             vertices[0] = [xA[0], yA[0]]
             codes[0] = cls.MOVETO

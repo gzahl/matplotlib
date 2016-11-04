@@ -363,7 +363,7 @@ RendererAgg::_draw_path(path_t &path, bool has_clippath, const facepair_t &face,
         hatch_path_trans_t hatch_path_trans(hatch_path, hatch_trans);
         hatch_path_curve_t hatch_path_curve(hatch_path_trans);
         hatch_path_stroke_t hatch_path_stroke(hatch_path_curve);
-        hatch_path_stroke.width(points_to_pixels(gc.hatch_linewidth));
+        hatch_path_stroke.width(1.0);
         hatch_path_stroke.line_cap(agg::square_cap);
 
         // Render the path into the hatch buffer
@@ -738,14 +738,14 @@ inline void RendererAgg::draw_text_image(GCAgg &gc, ImageArray &image, int x, in
     typedef agg::renderer_scanline_aa<renderer_base, color_span_alloc_type, span_gen_type>
     renderer_type;
 
-    theRasterizer.reset_clipping();
-    rendererBase.reset_clipping(true);
     if (angle != 0.0) {
         agg::rendering_buffer srcbuf(
                 image.data(), (unsigned)image.dim(1),
                 (unsigned)image.dim(0), (unsigned)image.dim(1));
         agg::pixfmt_gray8 pixf_img(srcbuf);
 
+        theRasterizer.reset_clipping();
+        rendererBase.reset_clipping(true);
         set_clipbox(gc.cliprect, theRasterizer);
 
         agg::trans_affine mtx;
@@ -786,9 +786,9 @@ inline void RendererAgg::draw_text_image(GCAgg &gc, ImageArray &image, int x, in
             agg::rect_i clip;
 
             clip.init(int(mpl_round(gc.cliprect.x1)),
-                      int(mpl_round(height - gc.cliprect.y2)),
+                      int(mpl_round(gc.cliprect.y1)),
                       int(mpl_round(gc.cliprect.x2)),
-                      int(mpl_round(height - gc.cliprect.y1)));
+                      int(mpl_round(gc.cliprect.y2)));
             text.clip(clip);
         }
 
@@ -956,13 +956,13 @@ inline void RendererAgg::_draw_path_collection_generic(GCAgg &gc,
         typename PathGenerator::path_iterator path = path_generator(i);
 
         if (Ntransforms) {
-            int it = i % Ntransforms;
-            trans = agg::trans_affine(transforms(it, 0, 0),
-                                      transforms(it, 1, 0),
-                                      transforms(it, 0, 1),
-                                      transforms(it, 1, 1),
-                                      transforms(it, 0, 2),
-                                      transforms(it, 1, 2));
+            typename TransformArray::sub_t subtrans = transforms[i % Ntransforms];
+            trans = agg::trans_affine(subtrans(0, 0),
+                                      subtrans(1, 0),
+                                      subtrans(0, 1),
+                                      subtrans(1, 1),
+                                      subtrans(0, 2),
+                                      subtrans(1, 2));
             trans *= master_transform;
         } else {
             trans = master_transform;
@@ -984,13 +984,13 @@ inline void RendererAgg::_draw_path_collection_generic(GCAgg &gc,
         trans *= agg::trans_affine_translation(0.0, (double)height);
 
         if (Nfacecolors) {
-            int ic = i % Nfacecolors;
-            face.second = agg::rgba(facecolors(ic, 0), facecolors(ic, 1), facecolors(ic, 2), facecolors(ic, 3));
+            typename ColorArray::sub_t facecolor = facecolors[i % Nfacecolors];
+            face.second = agg::rgba(facecolor(0), facecolor(1), facecolor(2), facecolor(3));
         }
 
         if (Nedgecolors) {
-            int ic = i % Nedgecolors;
-            gc.color = agg::rgba(edgecolors(ic, 0), edgecolors(ic, 1), edgecolors(ic, 2), edgecolors(ic, 3));
+            typename ColorArray::sub_t edgecolor = edgecolors[i % Nedgecolors];
+            gc.color = agg::rgba(edgecolor(0), edgecolor(1), edgecolor(2), edgecolor(3));
 
             if (Nlinewidths) {
                 gc.linewidth = linewidths(i % Nlinewidths);
@@ -1269,8 +1269,8 @@ inline void RendererAgg::draw_gouraud_triangles(GCAgg &gc,
     bool has_clippath = render_clippath(gc.clippath.path, gc.clippath.trans);
 
     for (int i = 0; i < points.dim(0); ++i) {
-        typename PointArray::sub_t point = points.subarray(i);
-        typename ColorArray::sub_t color = colors.subarray(i);
+        typename PointArray::sub_t point = points[i];
+        typename ColorArray::sub_t color = colors[i];
 
         _draw_gouraud_triangle(point, color, trans, has_clippath);
     }

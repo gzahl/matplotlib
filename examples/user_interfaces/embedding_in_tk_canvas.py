@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- noplot -*-
 
 import matplotlib as mpl

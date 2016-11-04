@@ -18,10 +18,9 @@ mask[40:60, 40:60] = 1
 U = np.ma.array(U, mask=mask)
 U[:20, :20] = np.nan
 
-fig, ax = plt.subplots()
-ax.streamplot(X, Y, U, V, color='r')
+plt.streamplot(X, Y, U, V, color='r')
 
-ax.imshow(~mask, extent=(-w, w, -w, w), alpha=0.5,
-          interpolation='nearest', cmap=plt.cm.gray)
+plt.imshow(~mask, extent=(-w, w, -w, w), alpha=0.5,
+           interpolation='nearest', cmap=plt.cm.gray)
 
 plt.show()

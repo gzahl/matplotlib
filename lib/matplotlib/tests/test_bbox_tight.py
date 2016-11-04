@@ -1,8 +1,8 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
-from six.moves import xrange
+from matplotlib.externals import six
+from matplotlib.externals.six.moves import xrange
 
 import numpy as np
 
@@ -34,7 +34,7 @@ def test_bbox_inches_tight():
     # the bottom values for stacked bar chart
     fig, ax = plt.subplots(1, 1)
     for row in xrange(rows):
-        ax.bar(ind, data[row], width, bottom=yoff, color='b')
+        plt.bar(ind, data[row], width, bottom=yoff)
         yoff = yoff + data[row]
         cellText.append([''])
     plt.xticks([])

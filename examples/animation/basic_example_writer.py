@@ -1,13 +1,5 @@
-"""
-===================
-Saving an animation
-===================
-
-This example showcases the same animations as `basic_example.py`, but instead
-of displaying the animation to the user, it writes to files using a
-MovieWriter instance.
-"""
-
+# Same as basic_example, but writes files using a single MovieWriter instance
+# without putting on screen
 # -*- noplot -*-
 import numpy as np
 import matplotlib
@@ -19,10 +11,6 @@ import matplotlib.animation as animation
 def update_line(num, data, line):
     line.set_data(data[..., :num])
     return line,
-
-# Fixing random state for reproducibility
-np.random.seed(19680801)
-
 
 # Set up formatting for the movie files
 Writer = animation.writers['ffmpeg']

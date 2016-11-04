@@ -1,10 +1,10 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import warnings
-import six
+from matplotlib.externals import six
 
 import io
-from itertools import chain
+
 import numpy as np
 
 import matplotlib.pyplot as plt
@@ -13,7 +13,6 @@ import matplotlib.lines as mlines
 import matplotlib.path as mpath
 import matplotlib.transforms as mtrans
 import matplotlib.collections as mcollections
-import matplotlib.artist as martist
 import matplotlib as mpl
 from matplotlib.testing.decorators import image_comparison, cleanup
 
@@ -182,20 +181,21 @@ def test_remove():
 @image_comparison(baseline_images=["default_edges"], remove_text=True,
                   extensions=['png'], style='default')
 def test_default_edges():
-    fig, [[ax1, ax2], [ax3, ax4]] = plt.subplots(2, 2)
+    with mpl.rc_context({'patch.linewidth': None}):
+        fig, [[ax1, ax2], [ax3, ax4]] = plt.subplots(2, 2)
 
-    ax1.plot(np.arange(10), np.arange(10), 'x',
-             np.arange(10) + 1, np.arange(10), 'o')
-    ax2.bar(np.arange(10), np.arange(10), align='edge')
-    ax3.text(0, 0, "BOX", size=24, bbox=dict(boxstyle='sawtooth'))
-    ax3.set_xlim((-1, 1))
-    ax3.set_ylim((-1, 1))
-    pp1 = mpatches.PathPatch(
-        mpath.Path([(0, 0), (1, 0), (1, 1), (0, 0)],
-             [mpath.Path.MOVETO, mpath.Path.CURVE3,
-              mpath.Path.CURVE3, mpath.Path.CLOSEPOLY]),
-        fc="none", transform=ax4.transData)
-    ax4.add_patch(pp1)
+        ax1.plot(np.arange(10), np.arange(10), 'x',
+                 np.arange(10) + 1, np.arange(10), 'o')
+        ax2.bar(np.arange(10), np.arange(10))
+        ax3.text(0, 0, "BOX", size=24, bbox=dict(boxstyle='sawtooth'))
+        ax3.set_xlim((-1, 1))
+        ax3.set_ylim((-1, 1))
+        pp1 = mpatches.PathPatch(
+            mpath.Path([(0, 0), (1, 0), (1, 1), (0, 0)],
+                 [mpath.Path.MOVETO, mpath.Path.CURVE3,
+                  mpath.Path.CURVE3, mpath.Path.CLOSEPOLY]),
+            fc="none", transform=ax4.transData)
+        ax4.add_patch(pp1)
 
 
 @cleanup
@@ -206,21 +206,6 @@ def test_properties():
         warnings.simplefilter("always")
         ln.properties()
         assert len(w) == 0
-
-
-@cleanup
-def test_setp():
-    # Check arbitrary iterables
-    fig, axes = plt.subplots()
-    lines1 = axes.plot(range(3))
-    lines2 = axes.plot(range(3))
-    martist.setp(chain(lines1, lines2), 'lw', 5)
-    plt.setp(axes.spines.values(), color='green')
-
-    # Check `file` argument
-    sio = io.StringIO()
-    plt.setp(lines1, 'zorder', file=sio)
-    assert sio.getvalue() == '  zorder: any number \n'
 
 
 if __name__ == '__main__':

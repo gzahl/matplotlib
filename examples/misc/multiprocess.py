@@ -1,4 +1,3 @@
-# -*- noplot -*-
 # Demo of using multiprocessing for generating data in one process and plotting
 # in another.
 # Written by Robert Cimrman
@@ -12,9 +11,6 @@ import matplotlib
 matplotlib.use('GtkAgg')
 import matplotlib.pyplot as plt
 import gobject
-
-# Fixing random state for reproducibility
-np.random.seed(19680801)
 
 
 class ProcessPlotter(object):

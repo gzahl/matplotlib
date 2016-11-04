@@ -1,8 +1,8 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
-from six import unichr
+from matplotlib.externals import six
+from matplotlib.externals.six import unichr
 import os
 import re
 import signal
@@ -22,7 +22,12 @@ from matplotlib.backend_bases import ShowBase
 from matplotlib._pylab_helpers import Gcf
 from matplotlib.figure import Figure
 
+
 from matplotlib.widgets import SubplotTool
+try:
+    import matplotlib.backends.qt_editor.figureoptions as figureoptions
+except ImportError:
+    figureoptions = None
 
 from .qt_compat import QtCore, QtWidgets, _getSaveFileName, __version__
 from matplotlib.backends.qt_editor.formsubplottool import UiSubplotTool
@@ -70,9 +75,6 @@ class FigureCanvasQT(FigureCanvasQT5):
         self._idle = True
         w, h = self.get_width_height()
         self.resize(w, h)
-
-        # Key auto-repeat enabled by default
-        self._keyautorepeat = True
 
     def wheelEvent(self, event):
         x = event.x()

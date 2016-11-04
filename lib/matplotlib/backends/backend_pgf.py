@@ -1,7 +1,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
+from matplotlib.externals import six
 
 import math
 import os
@@ -609,23 +609,9 @@ class RendererPgf(RendererBase):
             actions.append("fill")
         writeln(self.fh, r"\pgfusepath{%s}" % ",".join(actions))
 
-    def option_scale_image(self):
-        """
-        pgf backend supports affine transform of image.
-        """
-        return True
-
-    def option_image_nocomposite(self):
-        """
-        return whether to generate a composite image from multiple images on
-        a set of axes
-        """
-        return not rcParams['image.composite_image']
-
-    def draw_image(self, gc, x, y, im, transform=None):
-        h, w = im.shape[:2]
-        if w == 0 or h == 0:
-            return
+    def draw_image(self, gc, x, y, im):
+        # TODO: Almost no documentation for the behavior of this function.
+        #       Something missing?
 
         # save the images to png files
         path = os.path.dirname(self.fh.name)
@@ -637,23 +623,9 @@ class RendererPgf(RendererBase):
         # reference the image in the pgf picture
         writeln(self.fh, r"\begin{pgfscope}")
         self._print_pgf_clip(gc)
+        h, w = im.shape[:2]
         f = 1. / self.dpi  # from display coords to inch
-        if transform is None:
-            writeln(self.fh,
-                    r"\pgfsys@transformshift{%fin}{%fin}" % (x * f, y * f))
-            w, h = w * f, h * f
-        else:
-            tr1, tr2, tr3, tr4, tr5, tr6 = transform.frozen().to_values()
-            writeln(self.fh,
-                    r"\pgfsys@transformcm{%f}{%f}{%f}{%f}{%fin}{%fin}" %
-                    (tr1 * f, tr2 * f, tr3 * f, tr4 * f,
-                     (tr5 + x) * f, (tr6 + y) * f))
-            w = h = 1  # scale is already included in the transform
-        interp = str(transform is None).lower()  # interpolation in PDF reader
-        writeln(self.fh,
-                r"\pgftext[left,bottom]"
-                r"{\pgfimage[interpolate=%s,width=%fin,height=%fin]{%s}}" %
-                (interp, w, h, fname_img))
+        writeln(self.fh, r"\pgftext[at=\pgfqpoint{%fin}{%fin},left,bottom]{\pgfimage[interpolate=true,width=%fin,height=%fin]{%s}}" % (x * f, y * f, w * f, h * f, fname_img))
         writeln(self.fh, r"\end{pgfscope}")
 
     def draw_tex(self, gc, x, y, s, prop, angle, ismath="TeX!", mtext=None):
@@ -681,10 +653,7 @@ class RendererPgf(RendererBase):
 
         f = 1.0 / self.figure.dpi
         text_args = []
-        if mtext and (
-                (angle == 0 or
-                 mtext.get_rotation_mode() == "anchor") and
-                mtext.get_va() != "center_baseline"):
+        if mtext and (angle == 0 or mtext.get_rotation_mode() == "anchor"):
             # if text anchoring can be supported, get the original coordinates
             # and add alignment information
             x, y = mtext.get_transform().transform_point(mtext.get_position())

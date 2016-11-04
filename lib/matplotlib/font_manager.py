@@ -22,8 +22,7 @@ found.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
-from six.moves import cPickle as pickle
+from matplotlib.externals import six
 
 """
 KNOWN ISSUES
@@ -49,6 +48,10 @@ License   : matplotlib license (PSF compatible)
 
 import json
 import os, sys, warnings
+try:
+    set
+except NameError:
+    from sets import Set as set
 from collections import Iterable
 import matplotlib
 from matplotlib import afm
@@ -183,7 +186,7 @@ def win32FontDirectory():
     If the key is not found, $WINDIR/Fonts will be returned.
     """
     try:
-        from six.moves import winreg
+        from matplotlib.externals.six.moves import winreg
     except ImportError:
         pass # Fall through to default
     else:
@@ -208,7 +211,7 @@ def win32InstalledFonts(directory=None, fontext='ttf'):
     'afm'.
     """
 
-    from six.moves import winreg
+    from matplotlib.externals.six.moves import winreg
     if directory is None:
         directory = win32FontDirectory()
 
@@ -559,10 +562,8 @@ def createFontList(fontfiles, fontext='ttf'):
     for fpath in fontfiles:
         verbose.report('createFontDict: %s' % (fpath), 'debug')
         fname = os.path.split(fpath)[1]
-        if fname in seen:
-            continue
-        else:
-            seen[fname] = 1
+        if fname in seen:  continue
+        else: seen[fname] = 1
         if fontext == 'afm':
             try:
                 fh = open(fpath, 'rb')
@@ -575,7 +576,7 @@ def createFontList(fontfiles, fontext='ttf'):
                 finally:
                     fh.close()
             except RuntimeError:
-                verbose.report("Could not parse font file %s" % fpath)
+                verbose.report("Could not parse font file %s"%fpath)
                 continue
             try:
                 prop = afmFontProperty(fpath, font)
@@ -585,23 +586,19 @@ def createFontList(fontfiles, fontext='ttf'):
             try:
                 font = ft2font.FT2Font(fpath)
             except RuntimeError:
-                verbose.report("Could not open font file %s" % fpath)
+                verbose.report("Could not open font file %s"%fpath)
                 continue
             except UnicodeError:
                 verbose.report("Cannot handle unicode filenames")
-                # print >> sys.stderr, 'Bad file is', fpath
-                continue
-            except IOError:
-                verbose.report("IO error - cannot open font file %s" % fpath)
+                #print >> sys.stderr, 'Bad file is', fpath
                 continue
             try:
                 prop = ttfFontProperty(font)
-            except (KeyError, RuntimeError, ValueError):
+            except (KeyError, RuntimeError):
                 continue
 
         fontlist.append(prop)
     return fontlist
-
 
 class FontProperties(object):
     """
@@ -1358,7 +1355,7 @@ def is_opentype_cff_font(filename):
         if result is None:
             with open(filename, 'rb') as fd:
                 tag = fd.read(4)
-            result = (tag == b'OTTO')
+            result = (tag == 'OTTO')
             _is_opentype_cff_font_cache[filename] = result
         return result
     return False
@@ -1449,8 +1446,6 @@ else:
             else:
                 fontManager.default_size = None
                 verbose.report("Using fontManager instance from %s" % _fmcache)
-        except cbook.Locked.TimeoutError:
-            raise
         except:
             _rebuild()
     else:

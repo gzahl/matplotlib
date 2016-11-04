@@ -1,30 +1,25 @@
 '''
-This illustrates the NonUniformImage class.  It is not
-available via an Axes method but it is easily added to an
-Axes instance as shown here.
+This illustrates the NonUniformImage class, which still needs
+an axes method interface; either a separate interface, or a
+generalization of imshow.
 '''
 
+from matplotlib.pyplot import figure, show
 import numpy as np
-import matplotlib.pyplot as plt
 from matplotlib.image import NonUniformImage
 from matplotlib import cm
 
 interp = 'nearest'
 
-# Linear x array for cell centers:
 x = np.linspace(-4, 4, 9)
-
-# Highly nonlinear x array:
 x2 = x**3
-
 y = np.linspace(-4, 4, 9)
-
+#print('Size %d points' % (len(x) * len(y)))
 z = np.sqrt(x[np.newaxis, :]**2 + y[:, np.newaxis]**2)
 
-fig, axs = plt.subplots(nrows=2, ncols=2)
-fig.subplots_adjust(bottom=0.07, hspace=0.3)
-fig.suptitle('NonUniformImage class', fontsize='large')
-ax = axs[0, 0]
+fig = figure()
+fig.suptitle('NonUniformImage class')
+ax = fig.add_subplot(221)
 im = NonUniformImage(ax, interpolation=interp, extent=(-4, 4, -4, 4),
                      cmap=cm.Purples)
 im.set_data(x, y, z)
@@ -33,7 +28,7 @@ ax.set_xlim(-4, 4)
 ax.set_ylim(-4, 4)
 ax.set_title(interp)
 
-ax = axs[0, 1]
+ax = fig.add_subplot(222)
 im = NonUniformImage(ax, interpolation=interp, extent=(-64, 64, -4, 4),
                      cmap=cm.Purples)
 im.set_data(x2, y, z)
@@ -44,7 +39,7 @@ ax.set_title(interp)
 
 interp = 'bilinear'
 
-ax = axs[1, 0]
+ax = fig.add_subplot(223)
 im = NonUniformImage(ax, interpolation=interp, extent=(-4, 4, -4, 4),
                      cmap=cm.Purples)
 im.set_data(x, y, z)
@@ -53,7 +48,7 @@ ax.set_xlim(-4, 4)
 ax.set_ylim(-4, 4)
 ax.set_title(interp)
 
-ax = axs[1, 1]
+ax = fig.add_subplot(224)
 im = NonUniformImage(ax, interpolation=interp, extent=(-64, 64, -4, 4),
                      cmap=cm.Purples)
 im.set_data(x2, y, z)
@@ -62,4 +57,4 @@ ax.set_xlim(-64, 64)
 ax.set_ylim(-4, 4)
 ax.set_title(interp)
 
-plt.show()
+show()

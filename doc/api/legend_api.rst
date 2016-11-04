@@ -1,6 +1,6 @@
-*************************
-legend and legend_handler
-*************************
+******
+Legend
+******
 
 
 :mod:`matplotlib.legend`

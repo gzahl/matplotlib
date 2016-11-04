@@ -13,12 +13,12 @@ Displays Agg images in the browser, with interactivity
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
+from matplotlib.externals import six
 
 import io
 import json
 import os
-import datetime
+import time
 import warnings
 
 import numpy as np
@@ -350,7 +350,7 @@ class FigureCanvasWebAggCore(backend_agg.FigureCanvasAgg):
         x, y = int(x) * self._dpi_ratio, int(y) * self._dpi_ratio
         fig = self.figure
         # An attempt at approximating the figure size in pixels.
-        fig.set_size_inches(x / fig.dpi, y / fig.dpi, forward=False)
+        fig.set_size_inches(x / fig.dpi, y / fig.dpi)
 
         _, _, w, h = self.figure.bbox.bounds
         # Acknowledge the resize, and force the viewer to update the
@@ -501,7 +501,6 @@ class FigureManagerWebAgg(backend_bases.FigureManagerBase):
         with io.open(os.path.join(
                 os.path.dirname(__file__),
                 "web_backend",
-                "js",
                 "mpl.js"), encoding='utf8') as fd:
             output.write(fd.read())
 

@@ -1,7 +1,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
+from matplotlib.externals import six
 import warnings
 
 import numpy as np
@@ -159,8 +159,7 @@ def test_tight_layout8():
     example_plot(ax, fontsize=24)
 
 
-# The following test is misleading when the text is removed.
-@image_comparison(baseline_images=['outward_ticks'], remove_text=False)
+@image_comparison(baseline_images=['outward_ticks'], remove_text=True)
 def test_outward_ticks():
     'Test automatic use of tight_layout'
     fig = plt.figure()
@@ -171,8 +170,6 @@ def test_outward_ticks():
         tickdir='out', length=32, width=3, tick1On=True, which='minor')
     ax.yaxis.set_tick_params(
         tickdir='out', length=32, width=3, tick1On=True, which='minor')
-    # The following minor ticks are not labelled, and they
-    # are drawn over the major ticks and labels--ugly!
     ax.xaxis.set_ticks([0], minor=True)
     ax.yaxis.set_ticks([0], minor=True)
     ax = fig.add_subplot(222)

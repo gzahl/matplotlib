@@ -21,8 +21,8 @@ is a thin wrapper over :meth:`~matplotlib.figure.Figure.colorbar`.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
-from six.moves import xrange, zip
+from matplotlib.externals import six
+from matplotlib.externals.six.moves import xrange, zip
 
 import warnings
 
@@ -341,7 +341,6 @@ class ColorbarBase(cm.ScalarMappable):
         Calculate any free parameters based on the current cmap and norm,
         and do all the drawing.
         '''
-
         self._process_values()
         self._find_range()
         X, Y = self._mesh()
@@ -396,10 +395,6 @@ class ColorbarBase(cm.ScalarMappable):
         if update_ticks:
             self.update_ticks()
         self.stale = True
-
-    def get_ticks(self, minor=False):
-        """Return the x ticks as a list of locations"""
-        return self._tick_data_values
 
     def set_ticklabels(self, ticklabels, update_ticks=True):
         """
@@ -581,10 +576,7 @@ class ColorbarBase(cm.ScalarMappable):
                 elif isinstance(self.norm, colors.LogNorm):
                     locator = ticker.LogLocator()
                 else:
-                    if mpl.rcParams['_internal.classic_mode']:
-                        locator = ticker.MaxNLocator()
-                    else:
-                        locator = ticker.AutoLocator()
+                    locator = ticker.MaxNLocator()
             else:
                 b = self._boundaries[self._inside]
                 locator = ticker.FixedLocator(b, nbins=10)
@@ -606,7 +598,6 @@ class ColorbarBase(cm.ScalarMappable):
         else:
             eps = (intv[1] - intv[0]) * 1e-10
             b = b[(b <= intv[1] + eps) & (b >= intv[0] - eps)]
-        self._tick_data_values = b
         ticks = self._locate(b)
         formatter.set_locs(b)
         ticklabels = [formatter(t, i) for i, t in enumerate(b)]
@@ -1031,7 +1022,9 @@ def make_axes(parents, location=None, orientation=None, fraction=0.15,
               shrink=1.0, aspect=20, **kw):
     '''
     Resize and reposition parent axes, and return a child
-    axes suitable for a colorbar.
+    axes suitable for a colorbar::
+
+        cax, kw = make_axes(parent, **kw)
 
     Keyword arguments may include the following (with defaults):
 
@@ -1165,7 +1158,9 @@ def make_axes_gridspec(parent, **kw):
         of the parent with a new one.
 
     While this function is meant to be compatible with *make_axes*,
-    there could be some minor differences.
+    there could be some minor differences.::
+
+        cax, kw = make_axes_gridspec(parent, **kw)
 
     Keyword arguments may include the following (with defaults):
 

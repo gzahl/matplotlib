@@ -14,7 +14,7 @@ contains all the plot elements.  The following classes are defined
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
+from matplotlib.externals import six
 
 import warnings
 from operator import itemgetter
@@ -523,11 +523,6 @@ class Figure(Artist):
           *verticalalignment* : 'top'
             The vertical alignment of the text
 
-        If the `fontproperties` keyword argument is given then the
-        rcParams defaults for `fontsize` (`figure.titlesize`) and
-        `fontweight` (`figure.titleweight`) will be ignored in favour
-        of the `FontProperties` defaults.
-
         A :class:`matplotlib.text.Text` instance is returned.
 
         Example::
@@ -542,11 +537,10 @@ class Figure(Artist):
         if ('verticalalignment' not in kwargs) and ('va' not in kwargs):
             kwargs['verticalalignment'] = 'top'
 
-        if 'fontproperties' not in kwargs:
-            if 'fontsize' not in kwargs and 'size' not in kwargs:
-                kwargs['size'] = rcParams['figure.titlesize']
-            if 'fontweight' not in kwargs and 'weight' not in kwargs:
-                kwargs['weight'] = rcParams['figure.titleweight']
+        if 'fontsize' not in kwargs and 'size' not in kwargs:
+            kwargs['size'] = rcParams['figure.titlesize']
+        if 'fontweight' not in kwargs and 'weight' not in kwargs:
+            kwargs['weight'] = rcParams['figure.titleweight']
 
         sup = self.text(x, y, t, **kwargs)
         if self._suptitle is not None:
@@ -674,7 +668,7 @@ class Figure(Artist):
         self.stale = True
         return im
 
-    def set_size_inches(self, w, h=None, forward=True):
+    def set_size_inches(self, w, h=None, forward=False):
         """
         set_size_inches(w,h, forward=False)
 
@@ -1025,40 +1019,48 @@ class Figure(Artist):
 
         Parameters
         ----------
-        nrows, ncols : int, default: 1
-            Number of rows/cols of the subplot grid.
+        nrows : int, default: 1
+            Number of rows of the subplot grid.
 
-        sharex, sharey : bool or {'none', 'all', 'row', 'col'}, default: False
-            Controls sharing of properties among x (`sharex`) or y (`sharey`)
-            axes:
+        ncols : int, default: 1
+            Number of columns of the subplot grid.
 
-                - True or 'all': x- or y-axis will be shared among all
-                  subplots.
-                - False or 'none': each subplot x- or y-axis will be
-                  independent.
-                - 'row': each subplot row will share an x- or y-axis.
-                - 'col': each subplot column will share an x- or y-axis.
+        sharex : {"none", "all", "row", "col"} or bool, default: False
+            If *False*, or "none", each subplot has its own X axis.
 
-            When subplots have a shared x-axis along a column, only the x tick
-            labels of the bottom subplot are visible.  Similarly, when
-            subplots have a shared y-axis along a row, only the y tick labels
-            of the first column subplot are visible.
+            If *True*, or "all", all subplots will share an X axis, and the x
+            tick labels on all but the last row of plots will be invisible.
+
+            If "col", each subplot column will share an X axis, and the x
+            tick labels on all but the last row of plots will be invisible.
+
+            If "row", each subplot row will share an X axis.
+
+        sharey : {"none", "all", "row", "col"} or bool, default: False
+            If *False*, or "none", each subplot has its own Y axis.
+
+            If *True*, or "all", all subplots will share an Y axis, and the y
+            tick labels on all but the first column of plots will be invisible.
+
+            If "row", each subplot row will share an Y axis, and the y tick
+            labels on all but the first column of plots will be invisible.
+
+            If "col", each subplot column will share an Y axis.
 
         squeeze : bool, default: True
-            - If True, extra dimensions are squeezed out from the returned
-              axis object:
+            If *True*, extra dimensions are squeezed out from the returned axes
+            array:
 
-                - if only one subplot is constructed (nrows=ncols=1), the
-                  resulting single Axes object is returned as a scalar.
-                - for Nx1 or 1xN subplots, the returned object is a 1D numpy
-                  object array of Axes objects are returned as numpy 1D
-                  arrays.
-                - for NxM, subplots with N>1 and M>1 are returned as a 2D
-                  arrays.
+            - if only one subplot is constructed (nrows=ncols=1), the resulting
+              single Axes object is returned as a scalar.
 
-            - If False, no squeezing at all is done: the returned Axes object
-              is always a 2D array containing Axes instances, even if it ends
-              up being 1x1.
+            - for Nx1 or 1xN subplots, the returned object is a 1-d numpy
+              object array of Axes objects are returned as numpy 1-d arrays.
+
+            - for NxM subplots with N>1 and M>1 are returned as a 2d array.
+
+            If *False*, no squeezing at all is done: the returned object is
+            always a 2-d array of Axes instances, even if it ends up being 1x1.
 
         subplot_kw : dict, default: {}
             Dict with keywords passed to the
@@ -1337,35 +1339,11 @@ class Figure(Artist):
             if *False*, legend marker is placed to the right of the legend
             label
 
-          *frameon*: [ *None* | bool ]
-            Control whether the legend should be drawn on a patch (frame).
-            Default is *None* which will take the value from the
-            ``legend.frameon`` :data:`rcParam<matplotlib.rcParams>`.
-
           *fancybox*: [ *None* | *False* | *True* ]
             if *True*, draw a frame with a round fancybox.  If *None*, use rc
 
           *shadow*: [ *None* | *False* | *True* ]
             If *True*, draw a shadow behind legend. If *None*, use rc settings.
-
-          *framealpha*: [ *None* | float ]
-            Control the alpha transparency of the legend's background.
-            Default is *None* which will take the value from the
-            ``legend.framealpha`` :data:`rcParam<matplotlib.rcParams>`.
-
-          *facecolor*: [ *None* | "inherit" | a color spec ]
-            Control the legend's background color.
-            Default is *None* which will take the value from the
-            ``legend.facecolor`` :data:`rcParam<matplotlib.rcParams>`.
-            If ``"inherit"``, it will take the ``axes.facecolor``
-            :data:`rcParam<matplotlib.rcParams>`.
-
-          *edgecolor*: [ *None* | "inherit" | a color spec ]
-            Control the legend's background patch edge color.
-            Default is *None* which will take the value from the
-            ``legend.edgecolor`` :data:`rcParam<matplotlib.rcParams>`.
-            If ``"inherit"``, it will take the ``axes.edgecolor``
-            :data:`rcParam<matplotlib.rcParams>`.
 
           *ncol* : integer
             number of columns. default is 1
@@ -1663,6 +1641,8 @@ class Figure(Artist):
         """
 
         kwargs.setdefault('dpi', rcParams['savefig.dpi'])
+        if kwargs['dpi'] == 'figure':
+            kwargs['dpi'] = self.get_dpi()
         frameon = kwargs.pop('frameon', rcParams['savefig.frameon'])
         transparent = kwargs.pop('transparent',
                                  rcParams['savefig.transparent'])
@@ -1752,6 +1732,11 @@ class Figure(Artist):
     def ginput(self, n=1, timeout=30, show_clicks=True, mouse_add=1,
                mouse_pop=3, mouse_stop=2):
         """
+        Call signature::
+
+          ginput(self, n=1, timeout=30, show_clicks=True,
+                 mouse_add=1, mouse_pop=3, mouse_stop=2)
+
         Blocking call to interact with the figure.
 
         This will wait for *n* clicks from the user and return a list of the
@@ -1786,6 +1771,10 @@ class Figure(Artist):
 
     def waitforbuttonpress(self, timeout=-1):
         """
+        Call signature::
+
+          waitforbuttonpress(self, timeout=-1)
+
         Blocking call to interact with the figure.
 
         This will return True is a key was pressed, False if a mouse

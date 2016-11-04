@@ -1,10 +1,9 @@
+#!/usr/bin/env python
+
 from matplotlib.widgets import Cursor
 import numpy as np
 import matplotlib.pyplot as plt
 
-
-# Fixing random state for reproducibility
-np.random.seed(19680801)
 
 fig = plt.figure(figsize=(8, 6))
 ax = fig.add_subplot(111, facecolor='#FFFFCC')

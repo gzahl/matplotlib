@@ -23,10 +23,9 @@ complexities. Open up a UNIX shell or a DOS command prompt and cd into a
 directory containing a minimal example in a file. Something like
 :file:`simple_plot.py` for example::
 
-  import matplotlib.pyplot as plt
-  fig, ax = plt.subplots()
-  ax.plot([1,2,3])
-  plt.show()
+  from pylab import *
+  plot([1,2,3])
+  show()
 
 and run it with::
 
@@ -52,6 +51,31 @@ The process for removing an installation of matplotlib depends on how
 matplotlib was originally installed on your system. Follow the steps
 below that goes with your original installation method to cleanly
 remove matplotlib from your system.
+
+Easy Install
+------------
+
+1. Delete the caches from your :ref:`.matplotlib configuration directory
+   <locating-matplotlib-config-dir>`.
+
+2. Run::
+
+     easy_install -m matplotlib
+
+
+3. Delete any .egg files or directories from your :ref:`installation
+   directory <locating-matplotlib-install>`.
+
+
+
+Windows installer
+-----------------
+
+1. Delete the caches from your :ref:`.matplotlib configuration directory
+   <locating-matplotlib-config-dir>`.
+
+2. Use :menuselection:`Start --> Control Panel` to start the :program:`Add and
+   Remove Software` utility.
 
 Source install
 --------------
@@ -205,7 +229,7 @@ Python.org Python
 ^^^^^^^^^^^^^^^^^
 
 Install pip following the `standard pip install instructions
-<http://pip.readthedocs.io/en/latest/installing.html>`_.  For the impatient,
+<http://pip.readthedocs.org/en/latest/installing.html>`_.  For the impatient,
 open a new Terminal.app window and::
 
     curl -O https://bootstrap.pypa.io/get-pip.py
@@ -222,8 +246,8 @@ You can now install matplotlib and all its dependencies with::
 
     pip install matplotlib
 
-Macports Python
-^^^^^^^^^^^^^^^
+Macports
+^^^^^^^^
 
 For Python 2.7::
 
@@ -235,8 +259,8 @@ For Python 3.4::
     sudo port install py34-pip
     sudo pip-3.4 install matplotlib
 
-Homebrew Python
-^^^^^^^^^^^^^^^
+Homebrew
+^^^^^^^^
 
 For Python 2.7::
 
@@ -350,4 +374,24 @@ know: see :ref:`reporting-problems`.
 Windows Notes
 =============
 
-See :ref:`installing_windows`.
+We recommend you use one of the excellent python collections which include
+Python itself and a wide range of libraries including matplotlib:
+
+- Anaconda_ from `Continuum Analytics`_
+- Canopy_ from Enthought_
+- `Python (x, y) <https://code.google.com/p/pythonxy>`_
+
+Python (X, Y) is Windows-only, whereas Anaconda and Canopy are cross-platform.
+
+.. _windows-installers:
+
+Standalone binary installers for Windows
+----------------------------------------
+
+If you have already installed Python and numpy, you can use one of the
+matplotlib binary installers for windows -- you can get these from the
+`the PyPI matplotlib page <http://pypi.python.org/pypi/matplotlib>`_
+site.  Choose the files with an ``.exe`` extension that match your
+version of Python (e.g., ``py2.7`` if you installed Python 2.7).  If
+you haven't already installed Python, you can get the official version
+from the `Python web site <http://python.org/download/>`_.

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 demonstrate NavigationToolbar with GTK3 accessed via pygobject
 """

@@ -1,8 +1,8 @@
 .. _adding-new-scales:
 
-=========================================================
-Developer's guide for creating scales and transformations
-=========================================================
+***********************************************
+Adding new scales and projections to matplotlib
+***********************************************
 
 .. ::author Michael Droettboom
 
@@ -130,6 +130,23 @@ interest.
 API documentation
 =================
 
-* :mod:`matplotlib.scale`
-* :mod:`matplotlib.projections`
-* :mod:`matplotlib.projections.polar`
+matplotlib.scale
+----------------
+
+.. automodule:: matplotlib.scale
+   :members:
+   :show-inheritance:
+
+matplotlib.projections
+----------------------
+
+.. automodule:: matplotlib.projections
+   :members:
+   :show-inheritance:
+
+matplotlib.projections.polar
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: matplotlib.projections.polar
+   :members:
+   :show-inheritance:

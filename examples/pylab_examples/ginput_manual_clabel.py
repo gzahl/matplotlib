@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- noplot -*-
 
 from __future__ import print_function

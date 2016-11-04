@@ -27,9 +27,8 @@ derived from the base class (HandlerBase) with the following method.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import six
-from six.moves import zip
-from itertools import cycle
+from matplotlib.externals import six
+from matplotlib.externals.six.moves import zip
 
 import numpy as np
 
@@ -151,14 +150,13 @@ class HandlerNpoints(HandlerBase):
         if numpoints > 1:
             # we put some pad here to compensate the size of the
             # marker
-            pad = self._marker_pad * fontsize
-            xdata = np.linspace(-xdescent + pad,
-                                -xdescent + width - pad,
+            xdata = np.linspace(-xdescent + self._marker_pad * fontsize,
+                                width - self._marker_pad * fontsize,
                                 numpoints)
             xdata_marker = xdata
         elif numpoints == 1:
-            xdata = np.linspace(-xdescent, -xdescent+width, 2)
-            xdata_marker = [-xdescent + 0.5 * width]
+            xdata = np.linspace(-xdescent, width, 2)
+            xdata_marker = [0.5 * width - 0.5 * xdescent]
 
         return xdata, xdata_marker
 
@@ -316,7 +314,7 @@ class HandlerRegularPolyCollection(HandlerNpointsYoffsets):
             numpoints = self.get_numpoints(legend)
             if numpoints < 4:
                 sizes = [.5 * (size_max + size_min), size_max,
-                         size_min][:numpoints]
+                         size_min]
             else:
                 rng = (size_max - size_min)
                 sizes = rng * np.linspace(0, 1, numpoints) + size_min
@@ -501,7 +499,6 @@ class HandlerErrorbar(HandlerLine2D):
 
         return artists
 
-
 class HandlerStem(HandlerNpointsYoffsets):
     """
     Handler for Errorbars
@@ -568,29 +565,9 @@ class HandlerStem(HandlerNpointsYoffsets):
 
 class HandlerTuple(HandlerBase):
     """
-    Handler for Tuple.
-
-    Additional kwargs are passed through to `HandlerBase`.
-
-    Parameters
-    ----------
-
-    ndivide : int, optional
-        The number of sections to divide the legend area into.  If None,
-        use the length of the input tuple. Default is 1.
-
-
-    pad : float, optional
-        If None, fall back to `legend.borderpad` as the default.
-        In units of fraction of font size. Default is None.
-
-
-
+    Handler for Tuple
     """
-    def __init__(self, ndivide=1, pad=None, **kwargs):
-
-        self._ndivide = ndivide
-        self._pad = pad
+    def __init__(self, **kwargs):
         HandlerBase.__init__(self, **kwargs)
 
     def create_artists(self, legend, orig_handle,
@@ -598,30 +575,11 @@ class HandlerTuple(HandlerBase):
                        trans):
 
         handler_map = legend.get_legend_handler_map()
-
-        if self._ndivide is None:
-            ndivide = len(orig_handle)
-        else:
-            ndivide = self._ndivide
-
-        if self._pad is None:
-            pad = legend.borderpad * fontsize
-        else:
-            pad = self._pad * fontsize
-
-        if ndivide > 1:
-            width = (width - pad*(ndivide - 1)) / ndivide
-
-        xds = [xdescent - (width + pad) * i for i in range(ndivide)]
-        xds_cycle = cycle(xds)
-
         a_list = []
         for handle1 in orig_handle:
             handler = legend.get_legend_handler(handler_map, handle1)
             _a_list = handler.create_artists(legend, handle1,
-                                             six.next(xds_cycle),
-                                             ydescent,
-                                             width, height,
+                                             xdescent, ydescent, width, height,
                                              fontsize,
                                              trans)
             a_list.extend(_a_list)
@@ -635,7 +593,7 @@ class HandlerPolyCollection(HandlerBase):
     """
     def _update_prop(self, legend_handle, orig_handle):
         def first_color(colors):
-            colors = mcolors.to_rgba_array(colors)
+            colors = mcolors.colorConverter.to_rgba_array(colors)
             if len(colors):
                 return colors[0]
             else:
